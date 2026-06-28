@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from './supabaseClient';
 import { ensureAuthenticated, saveProfile, getProfile } from './utils/auth';
 import { extractPropertyData, getDomainForCurrentPage } from './utils/scraper';
 import { usePaymentSync } from './hooks/usePaymentSync';
 import { useSessionSync } from './hooks/useSessionSync';
+import { usePresenceSync } from './hooks/usePresenceSync';
 
 import LoadingScreen from './screens/LoadingScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -50,6 +52,7 @@ export default function Hero() {
 
   const members    = usePaymentSync(session?.id);
   const liveSession = useSessionSync(session?.id);
+  const { activeUsers, remoteCursors, remoteSelections, sendCursor, sendSelection } = usePresenceSync(session?.id, profile ? { ...profile, id: user?.id } : null);
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -172,6 +175,44 @@ export default function Hero() {
     window.addEventListener('splitsync-checkout-intercepted', handler);
     return () => window.removeEventListener('splitsync-checkout-intercepted', handler);
   }, [session, profile]);
+
+  // ── Multiplayer real-time cursor & selection tracking ───────────────────────
+  useEffect(() => {
+    if (!session?.id || !profile) return;
+
+    let lastSent = 0;
+    const handleMouseMove = (e) => {
+      const now = Date.now();
+      if (now - lastSent > 120) { // Throttle cursor broadcasts
+        sendCursor(e.pageX, e.pageY);
+        lastSent = now;
+      }
+    };
+
+    const handleMouseUp = () => {
+      // Small timeout to allow selection object to update
+      setTimeout(() => {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+        if (text && text.length < 500) { // Limit length
+          try {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const x = rect.left + window.scrollX;
+            const y = rect.top + window.scrollY;
+            sendSelection(text, x, y);
+          } catch (_) {}
+        }
+      }, 50);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [session?.id, profile]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const refreshRules = useCallback(async () => {
@@ -546,6 +587,83 @@ export default function Hero() {
               <span className="text-[10px] text-emerald-400">Session active · {members.length} members</span>
               <span className="text-[10px] text-neutral-500">Click ▲ to expand</span>
             </div>
+          )}
+          {createPortal(
+            <>
+              {Object.keys(remoteCursors).map((id) => {
+                const cursor = remoteCursors[id];
+                return (
+                  <div
+                    key={`cursor-${id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${cursor.x}px`,
+                      top: `${cursor.y}px`,
+                      width: '12px',
+                      height: '12px',
+                      borderRadius: '50%',
+                      backgroundColor: cursor.color,
+                      pointerEvents: 'none',
+                      zIndex: 2147483646,
+                      transition: 'left 0.08s ease-out, top 0.08s ease-out',
+                      transform: 'translate(-50%, -50%)',
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '12px',
+                        top: '-6px',
+                        backgroundColor: cursor.color,
+                        color: '#fff',
+                        textShadow: '0 1px 1px rgba(0,0,0,0.5)',
+                        fontSize: '9px',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
+                      }}
+                    >
+                      {cursor.userName}
+                    </div>
+                  </div>
+                );
+              })}
+              {Object.keys(remoteSelections).map((id) => {
+                const selection = remoteSelections[id];
+                return (
+                  <div
+                    key={`selection-${id}`}
+                    style={{
+                      position: 'absolute',
+                      left: `${selection.x}px`,
+                      top: `${selection.y - 35}px`,
+                      backgroundColor: '#1f2937',
+                      color: '#fff',
+                      border: `1.5px solid ${selection.color}`,
+                      fontSize: '11px',
+                      fontWeight: '500',
+                      padding: '5px 9px',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                      pointerEvents: 'none',
+                      zIndex: 2147483645,
+                      maxWidth: '220px',
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      transform: 'translateX(-50%)',
+                    }}
+                  >
+                    <div style={{ fontSize: '8px', color: selection.color, fontWeight: 'bold', marginBottom: '2px', textTransform: 'uppercase' }}>
+                      {selection.userName} selected:
+                    </div>
+                    "{selection.text}"
+                  </div>
+                );
+              })}
+            </>,
+            document.body
           )}
         </div>
       </ErrorBoundary>
