@@ -177,13 +177,12 @@ function ProductMockup() {
 
 interface StepProps {
   number: string | number;
-  icon: string;
   title: string;
   desc: string;
 }
 
 // Step card
-function Step({ number, icon, title, desc }: StepProps) {
+function Step({ number, title, desc }: StepProps) {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
@@ -325,19 +324,16 @@ export default function Hero() {
           <div className="flex flex-col gap-8">
             <Step
               number="1"
-              icon="🔍"
               title="Open any Airbnb or MakeMyTrip listing"
               desc="SplitSync automatically detects the property title and total cost — no copy-pasting needed."
             />
             <Step
               number="2"
-              icon="💬"
               title="Share your session ID on WhatsApp"
               desc='One tap generates a WhatsApp message with instructions. Friends install the extension, paste the ID, and join your session.'
             />
             <Step
               number="3"
-              icon="🔒"
               title="Lock the session and collect payment"
               desc="Each person confirms their share via UPI. Once everyone has paid, the Airbnb booking button unlocks. You book knowing you're already covered."
             />
