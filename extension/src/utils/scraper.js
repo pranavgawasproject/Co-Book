@@ -34,7 +34,7 @@ export async function extractPropertyData(selectors) {
             }
             const match = cleanedValue.match(new RegExp(rule.regexMatch));
             if (match) {
-              const parsed = parseInt(match[0], 10);
+              const parsed = parseFloat(match[0]);
               if (!isNaN(parsed) && parsed > 0) {
                 extractedData[key] = parsed;
                 found = true;
