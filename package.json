@@ -1,0 +1,9 @@
+{
+  "name": "cobook-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "npm --prefix website test -- --run",
+    "build": "npm --prefix website run build"
+  }
+}

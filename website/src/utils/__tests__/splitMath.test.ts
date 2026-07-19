@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { calculateEqualSplit, formatCurrency } from '../splitMath';
+import { calculateEqualSplit, calculatePercentageSplit, calculateWeightedSplit, formatCurrency } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
   test('should calculate per-person equal shares accurately without precision loss', () => {
@@ -19,7 +19,20 @@ describe('Co-Book Split Math Utility', () => {
     expect(calculateEqualSplit(100, 0)).toEqual({ perPersonShare: 0, remainderCents: 0 });
   });
 
+  test('should calculate percentage splits accurately', () => {
+    const result = calculatePercentageSplit(200, [50, 25, 25]);
+    expect(result.shares).toEqual([100, 50, 50]);
+    expect(result.remainderCents).toBe(0);
+  });
+
+  test('should calculate weighted splits accurately', () => {
+    const result = calculateWeightedSplit(100, [2, 1, 1]);
+    expect(result.shares).toEqual([50, 25, 25]);
+    expect(result.remainderCents).toBe(0);
+  });
+
   test('should format currency strings correctly', () => {
     expect(formatCurrency(49.99)).toBe('$49.99');
   });
 });
+
