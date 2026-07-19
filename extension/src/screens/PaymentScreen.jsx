@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { calculateEqualSplit, calculateEqualShares, formatCurrency } from '../utils/splitMath';
 
 // Desktop fallback: shows the UPI ID + a copy button + confirm-paid button
 function UpiCopyRow({ upiId, amount, onMarkPaid }) {
@@ -17,7 +18,7 @@ function UpiCopyRow({ upiId, amount, onMarkPaid }) {
           {upiCopied ? '✓' : 'Copy'}
         </button>
       </div>
-      <p className="text-[10px] text-neutral-600">Send ₹{amount?.toLocaleString()} then click below:</p>
+      <p className="text-[10px] text-neutral-600">Send {formatCurrency(amount, 'INR')} then click below:</p>
       <button onClick={onMarkPaid} className="w-full bg-neutral-700 hover:bg-emerald-500 hover:text-black text-neutral-300 font-semibold py-1.5 rounded-lg text-xs transition-colors">
         ✓ I've Paid — Confirm
       </button>
@@ -26,7 +27,9 @@ function UpiCopyRow({ upiId, amount, onMarkPaid }) {
 }
 
 export default function PaymentScreen({ session, members, myUserId, onMarkPaid, onUnlockCheckout }) {
-  const perPerson = members.length > 0 ? Math.ceil(session.total_cost / members.length) : session.total_cost;
+  const { perPersonShare } = calculateEqualSplit(session.total_cost, members.length || 1);
+  const shares = calculateEqualShares(session.total_cost, members.length || 1);
+
   const allPaid = members.every(m => m.payment_status === 'paid');
   const paidCount = members.filter(m => m.payment_status === 'paid').length;
 
@@ -36,6 +39,8 @@ export default function PaymentScreen({ session, members, myUserId, onMarkPaid, 
 
   const host = members.find(m => m.user_id === session.host_id);
   const myMember = members.find(m => m.user_id === myUserId);
+  const myIndex = members.findIndex(m => m.user_id === myUserId);
+  const myShare = myIndex >= 0 ? (shares[myIndex] || perPersonShare) : perPersonShare;
   const isHost = session.host_id === myUserId;
 
   return (
@@ -58,10 +63,11 @@ export default function PaymentScreen({ session, members, myUserId, onMarkPaid, 
 
       {/* Members payment status */}
       <div className="space-y-1.5 max-h-36 overflow-y-auto">
-        {members.map(member => {
+        {members.map((member, idx) => {
           const isPaid = member.payment_status === 'paid';
           const isMe = member.user_id === myUserId;
           const isThisHost = member.user_id === session.host_id;
+          const memberShare = shares[idx] || perPersonShare;
 
           return (
             <div key={member.user_id} className={`flex items-center gap-2 rounded-lg p-2 border transition-all ${isPaid ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-neutral-800/50 border-neutral-700/40 border-l-2 border-l-yellow-500'}`}>
@@ -74,7 +80,7 @@ export default function PaymentScreen({ session, members, myUserId, onMarkPaid, 
                   {isMe && <span className="text-neutral-500 text-[10px] ml-1">(you)</span>}
                   {isThisHost && <span className="text-amber-400 text-[10px] ml-1">host</span>}
                 </p>
-                <p className="text-neutral-400 text-[10px]">₹{perPerson.toLocaleString()}</p>
+                <p className="text-neutral-400 text-[10px]">{formatCurrency(memberShare, 'INR')}</p>
               </div>
               {isPaid ? (
                 <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded border border-emerald-500/20">✓ Paid</span>
@@ -92,7 +98,7 @@ export default function PaymentScreen({ session, members, myUserId, onMarkPaid, 
           {host?.profiles?.upi_id ? (
             <>
               {/* Desktop: show UPI ID + copy */}
-              <UpiCopyRow upiId={host.profiles.upi_id} amount={perPerson} onMarkPaid={() => onMarkPaid(myUserId)} />
+              <UpiCopyRow upiId={host.profiles.upi_id} amount={myShare} onMarkPaid={() => onMarkPaid(myUserId)} />
             </>
           ) : (
             <button

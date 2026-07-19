@@ -26,15 +26,16 @@ export async function extractPropertyData(selectors) {
           if (!text) continue;
 
           if (rule.regexMatch) {
-            let cleanedValue = text;
-            if (rule.removeChars) {
-              rule.removeChars.forEach(char => {
-                cleanedValue = cleanedValue.split(char).join('');
-              });
-            }
-            const match = cleanedValue.match(new RegExp(rule.regexMatch));
+            const match = text.match(new RegExp(rule.regexMatch));
             if (match) {
-              const parsed = parseFloat(match[0]);
+              let matchedStr = match[0];
+              if (rule.removeChars) {
+                rule.removeChars.forEach(char => {
+                  matchedStr = matchedStr.split(char).join('');
+                });
+              }
+              const sanitizedStr = matchedStr.replace(/,/g, '');
+              const parsed = parseFloat(sanitizedStr);
               if (!isNaN(parsed) && parsed > 0) {
                 extractedData[key] = parsed;
                 found = true;

@@ -70,14 +70,20 @@ export function usePresenceSync(sessionId, userProfile) {
         }
       });
 
-    channel.subscribe(async (status) => {
+    channel.subscribe(async (status, err) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({
-          id: userId,
-          name: userName,
-          color: userColor,
-          online_at: new Date().toISOString(),
-        });
+        try {
+          await channel.track({
+            id: userId,
+            name: userName,
+            color: userColor,
+            online_at: new Date().toISOString(),
+          });
+        } catch (trackErr) {
+          console.warn('[usePresenceSync] Track error:', trackErr?.message);
+        }
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        console.warn('[usePresenceSync] Realtime channel status:', status, err?.message || '');
       }
     });
 
@@ -111,40 +117,51 @@ export function usePresenceSync(sessionId, userProfile) {
 
     return () => {
       clearInterval(interval);
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, [sessionId, userProfile?.id, userProfile?.name]);
 
   const sendCursor = (x, y) => {
-    if (channelRef.current && userProfile?.id) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'cursor',
-        payload: {
-          userId: userProfile.id,
-          userName: userProfile.name || 'Anonymous',
-          color: getUserColor(userProfile.id),
-          x,
-          y,
-        },
-      });
+    if (channelRef.current && userProfile?.id && Number.isFinite(x) && Number.isFinite(y)) {
+      try {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'cursor',
+          payload: {
+            userId: userProfile.id,
+            userName: userProfile.name || 'Anonymous',
+            color: getUserColor(userProfile.id),
+            x: Math.round(x),
+            y: Math.round(y),
+          },
+        });
+      } catch (err) {
+        console.warn('[usePresenceSync] Send cursor failed:', err?.message);
+      }
     }
   };
 
   const sendSelection = (text, x, y) => {
-    if (channelRef.current && userProfile?.id) {
-      channelRef.current.send({
-        type: 'broadcast',
-        event: 'selection',
-        payload: {
-          userId: userProfile.id,
-          userName: userProfile.name || 'Anonymous',
-          color: getUserColor(userProfile.id),
-          text,
-          x,
-          y,
-        },
-      });
+    if (channelRef.current && userProfile?.id && text?.trim() && Number.isFinite(x) && Number.isFinite(y)) {
+      try {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'selection',
+          payload: {
+            userId: userProfile.id,
+            userName: userProfile.name || 'Anonymous',
+            color: getUserColor(userProfile.id),
+            text: text.trim().slice(0, 300),
+            x: Math.round(x),
+            y: Math.round(y),
+          },
+        });
+      } catch (err) {
+        console.warn('[usePresenceSync] Send selection failed:', err?.message);
+      }
     }
   };
 

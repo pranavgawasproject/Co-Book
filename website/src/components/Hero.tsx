@@ -1,12 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
+import { calculateEqualSplit, formatCurrency } from '../utils/splitMath';
 
 // Live typing simulation
 const scenarios = [
-  { city: 'Goa Villa',        total: 48000, people: 4, currency: '₹' },
-  { city: 'Bali Airbnb',      total: 72000, people: 6, currency: '₹' },
-  { city: 'Manali Homestay',  total: 18000, people: 3, currency: '₹' },
-  { city: 'Paris Apartment',  total:  1200, people: 4, currency: '€' },
+  { city: 'Goa Villa',        total: 48000, people: 4, currency: 'INR' },
+  { city: 'Bali Airbnb',      total: 72000, people: 6, currency: 'INR' },
+  { city: 'Manali Homestay',  total: 18000, people: 3, currency: 'INR' },
+  { city: 'Paris Apartment',  total:  1200, people: 4, currency: 'EUR' },
 ];
 
 interface MemberRowProps {
@@ -43,7 +44,7 @@ function MemberRow({ name, amount, status, currency, delay = 0 }: MemberRowProps
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-white text-xs font-semibold">{name}</p>
-        <p className="text-neutral-500 text-[11px]">{currency}{amount.toLocaleString()}</p>
+        <p className="text-neutral-500 text-[11px]">{formatCurrency(amount, currency)}</p>
       </div>
       {status === 'paid' ? (
         <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/20">
@@ -63,7 +64,7 @@ function ProductMockup() {
   const [scenarioIdx, setScenarioIdx] = useState(0);
   const [paidState, setPaidState] = useState([true, true, false]);
   const scenario = scenarios[scenarioIdx];
-  const perPerson = Math.ceil(scenario.total / scenario.people);
+  const perPerson = calculateEqualSplit(scenario.total, scenario.people).perPersonShare;
 
   // Cycle scenarios
   useEffect(() => {
@@ -120,11 +121,11 @@ function ProductMockup() {
             <div className="flex justify-between items-center mt-2">
               <div>
                 <p className="text-neutral-500 text-[10px]">Total</p>
-                <p className="text-white font-bold">{scenario.currency}{scenario.total.toLocaleString()}</p>
+                <p className="text-white font-bold">{formatCurrency(scenario.total, scenario.currency)}</p>
               </div>
               <div className="text-right">
                 <p className="text-neutral-500 text-[10px]">Per person ({scenario.people})</p>
-                <p className="text-emerald-400 font-bold">{scenario.currency}{perPerson.toLocaleString()}</p>
+                <p className="text-emerald-400 font-bold">{formatCurrency(perPerson, scenario.currency)}</p>
               </div>
             </div>
           </motion.div>

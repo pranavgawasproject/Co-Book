@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { calculateEqualSplit, calculateEqualShares, formatCurrency } from '../utils/splitMath';
 
 // Generates a WhatsApp share message with session details
 function makeWhatsAppMessage(session, perPerson) {
   const msg = `Hey! I'm planning a trip to *${session.property_title || 'a place'}* and need everyone to pay their share before I book.\n\n` +
-    `💸 Your share: *₹${Math.ceil(perPerson).toLocaleString('en-IN')}*\n\n` +
+    `💸 Your share: *${formatCurrency(perPerson, 'INR')}*\n\n` +
     `Install *SplitSync* extension → click "Join a Session" → paste this ID:\n` +
     `\`${session.id}\`\n\n` +
     `Install: https://splitsync-iota.vercel.app`;
@@ -14,11 +15,11 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
   const [copied, setCopied] = useState(false);
   const [editingCost, setEditingCost] = useState(false);
   const [newCost, setNewCost] = useState('');
+  const [costError, setCostError] = useState('');
 
-  const isHost    = session.host_id === myUserId;
-  const perPerson = members.length > 0
-    ? Math.ceil(session.total_cost / members.length)
-    : session.total_cost;
+  const isHost = session.host_id === myUserId;
+  const { perPersonShare } = calculateEqualSplit(session.total_cost, members.length || 1);
+  const shares = calculateEqualShares(session.total_cost, members.length || 1);
 
   const copySessionId = () => {
     navigator.clipboard.writeText(session.id).catch(() => {
@@ -34,11 +35,30 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
   };
 
   const openWhatsApp = () => {
-    const url = `https://wa.me/?text=${makeWhatsAppMessage(session, perPerson)}`;
+    const url = `https://wa.me/?text=${makeWhatsAppMessage(session, perPersonShare)}`;
     window.open(url, '_blank');
   };
 
-  const canLock = isHost && members.length >= 1; // Changed to 1 — host can lock even solo for testing
+  const canLock = isHost && members.length >= 1; // Host can lock even solo for testing
+
+  const handleSaveCost = async () => {
+    setCostError('');
+    const parsedCost = Number(newCost);
+    if (isNaN(parsedCost) || !isFinite(parsedCost) || parsedCost <= 0) {
+      setCostError('Enter a valid positive number for total cost.');
+      return;
+    }
+    const { supabase } = await import('../supabaseClient');
+    const { error } = await supabase.from('sessions')
+      .update({ total_cost: parsedCost })
+      .eq('id', session.id);
+
+    if (error) {
+      setCostError('Failed to update cost.');
+    } else {
+      setEditingCost(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -61,11 +81,11 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
         <div className="flex justify-between items-center">
           <div>
             <p className="text-[10px] text-neutral-500 uppercase tracking-wider">Total cost</p>
-            <p className="text-white font-bold text-base">₹{Number(session.total_cost).toLocaleString('en-IN')}</p>
+            <p className="text-white font-bold text-base">{formatCurrency(session.total_cost, 'INR')}</p>
           </div>
           <div className="text-right">
             <p className="text-[10px] text-neutral-500 uppercase tracking-wider">Per person ({members.length})</p>
-            <p className="text-emerald-400 font-bold text-base">₹{perPerson.toLocaleString('en-IN')}</p>
+            <p className="text-emerald-400 font-bold text-base">{formatCurrency(perPersonShare, 'INR')}</p>
           </div>
         </div>
       </a>
@@ -73,36 +93,33 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
       {/* ── Edit cost (host only) ── */}
       {isHost && !editingCost && (
         <button
-          onClick={() => { setEditingCost(true); setNewCost(String(session.total_cost)); }}
+          onClick={() => { setEditingCost(true); setNewCost(String(session.total_cost)); setCostError(''); }}
           className="text-[10px] text-neutral-600 hover:text-emerald-400 transition-colors -mt-1"
         >
           ✏ Update total cost
         </button>
       )}
       {isHost && editingCost && (
-        <div className="flex gap-2 -mt-1">
-          <input
-            autoFocus
-            type="number"
-            value={newCost}
-            onChange={e => setNewCost(e.target.value)}
-            className="flex-1 bg-neutral-800 border border-neutral-700 focus:border-emerald-500 text-white text-xs rounded-lg px-2.5 py-1.5 outline-none"
-            placeholder="New total (₹)"
-          />
-          <button
-            onClick={async () => {
-              const { supabase } = await import('../supabaseClient');
-              await supabase.from('sessions')
-                .update({ total_cost: Number(newCost) })
-                .eq('id', session.id);
-              setEditingCost(false);
-            }}
-            className="bg-emerald-500 text-black text-[10px] font-bold px-3 rounded-lg"
-          >Save</button>
-          <button
-            onClick={() => setEditingCost(false)}
-            className="text-neutral-500 text-[10px] px-2"
-          >✕</button>
+        <div className="flex flex-col gap-1 -mt-1">
+          <div className="flex gap-2">
+            <input
+              autoFocus
+              type="number"
+              value={newCost}
+              onChange={e => { setNewCost(e.target.value); setCostError(''); }}
+              className="flex-1 bg-neutral-800 border border-neutral-700 focus:border-emerald-500 text-white text-xs rounded-lg px-2.5 py-1.5 outline-none"
+              placeholder="New total (₹)"
+            />
+            <button
+              onClick={handleSaveCost}
+              className="bg-emerald-500 text-black text-[10px] font-bold px-3 rounded-lg"
+            >Save</button>
+            <button
+              onClick={() => { setEditingCost(false); setCostError(''); }}
+              className="text-neutral-500 text-[10px] px-2"
+            >✕</button>
+          </div>
+          {costError && <p className="text-[10px] text-red-400">{costError}</p>}
         </div>
       )}
 
@@ -113,7 +130,7 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
           <span className="text-[10px] text-neutral-500">{members.length} joined</span>
         </div>
         <div className="space-y-1.5 max-h-36 overflow-y-auto">
-          {members.map(member => (
+          {members.map((member, idx) => (
             <div
               key={member.user_id}
               className="flex items-center gap-2.5 bg-neutral-800/50 rounded-lg p-2 border border-neutral-800"
@@ -134,7 +151,7 @@ export default function LobbyScreen({ session, members, profile, myUserId, onLoc
                 )}
               </div>
               <span className="text-[10px] text-neutral-500 font-medium flex-shrink-0">
-                ₹{perPerson.toLocaleString('en-IN')}
+                {formatCurrency(shares[idx] || perPersonShare, 'INR')}
               </span>
             </div>
           ))}

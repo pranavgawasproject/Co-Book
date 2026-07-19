@@ -1,7 +1,7 @@
 /**
  * Safely convert dollar/rupee amount to total cents to avoid floating point precision issues.
  */
-function toCents(amount: number): number {
+function toCents(amount) {
   if (isNaN(amount) || !isFinite(amount) || amount <= 0) return 0;
   return Math.round((amount + Number.EPSILON) * 100);
 }
@@ -10,17 +10,15 @@ function toCents(amount: number): number {
  * Calculate equal expense split share for group members.
  * Returns base per-person share rounded to 2 decimal places and remainder.
  */
-export function calculateEqualSplit(totalAmount: number, memberCount: number): {
-  perPersonShare: number;
-  remainderCents: number;
-} {
+export function calculateEqualSplit(totalAmount, memberCount) {
   if (memberCount <= 0 || isNaN(memberCount) || !isFinite(memberCount) || totalAmount <= 0) {
     return { perPersonShare: 0, remainderCents: 0 };
   }
 
   const totalCents = toCents(totalAmount);
-  const baseShareCents = Math.floor(totalCents / memberCount);
-  const remainderCents = totalCents - baseShareCents * memberCount;
+  const count = Math.floor(memberCount);
+  const baseShareCents = Math.floor(totalCents / count);
+  const remainderCents = totalCents - baseShareCents * count;
 
   return {
     perPersonShare: baseShareCents / 100,
@@ -32,7 +30,7 @@ export function calculateEqualSplit(totalAmount: number, memberCount: number): {
  * Calculate individual member shares for equal splits, distributing remainder cents
  * so that sum(shares) equals totalAmount EXACTLY without cents losing/overcharging.
  */
-export function calculateEqualShares(totalAmount: number, memberCount: number): number[] {
+export function calculateEqualShares(totalAmount, memberCount) {
   if (memberCount <= 0 || isNaN(memberCount) || !isFinite(memberCount) || totalAmount <= 0) {
     return Array(Math.max(0, Math.floor(memberCount) || 0)).fill(0);
   }
@@ -42,7 +40,7 @@ export function calculateEqualShares(totalAmount: number, memberCount: number): 
   const baseShareCents = Math.floor(totalCents / count);
   let remainderCents = totalCents - baseShareCents * count;
 
-  const sharesInCents: number[] = [];
+  const sharesInCents = [];
   for (let i = 0; i < count; i++) {
     if (remainderCents > 0) {
       sharesInCents.push(baseShareCents + 1);
@@ -57,18 +55,8 @@ export function calculateEqualShares(totalAmount: number, memberCount: number): 
 
 /**
  * Calculate percentage-based expense split for group members.
- * @param totalAmount Total bill amount
- * @param percentages Array of percentage values for each participant (e.g., [50, 25, 25])
- * @param distributeRemainder If true, distributes leftover cents across initial shares so total sum matches totalAmount exactly.
  */
-export function calculatePercentageSplit(
-  totalAmount: number,
-  percentages: number[],
-  distributeRemainder = true
-): {
-  shares: number[];
-  remainderCents: number;
-} {
+export function calculatePercentageSplit(totalAmount, percentages, distributeRemainder = true) {
   if (totalAmount <= 0 || !percentages || !percentages.length) {
     return { shares: (percentages || []).map(() => 0), remainderCents: 0 };
   }
@@ -107,18 +95,8 @@ export function calculatePercentageSplit(
 
 /**
  * Calculate weighted expense split for group members.
- * @param totalAmount Total bill amount
- * @param weights Array of relative weights for each participant (e.g., [2, 1, 1])
- * @param distributeRemainder If true, distributes leftover cents across initial shares.
  */
-export function calculateWeightedSplit(
-  totalAmount: number,
-  weights: number[],
-  distributeRemainder = true
-): {
-  shares: number[];
-  remainderCents: number;
-} {
+export function calculateWeightedSplit(totalAmount, weights, distributeRemainder = true) {
   if (totalAmount <= 0 || !weights || !weights.length) {
     return { shares: (weights || []).map(() => 0), remainderCents: 0 };
   }
@@ -134,11 +112,8 @@ export function calculateWeightedSplit(
   return calculatePercentageSplit(totalAmount, percentages, distributeRemainder);
 }
 
-/**
- * Map default currency to appropriate Intl locale if not specified.
- */
-function getDefaultLocale(currency: string): string {
-  const code = currency.toUpperCase();
+function getDefaultLocale(currency) {
+  const code = (currency || 'USD').toUpperCase();
   switch (code) {
     case 'INR':
       return 'en-IN';
@@ -161,21 +136,18 @@ function getDefaultLocale(currency: string): string {
 /**
  * Format currency amounts with smart locale defaults and edge case fallback.
  */
-export function formatCurrency(amount: number, currency = 'USD', locale?: string): string {
+export function formatCurrency(amount, currency = 'INR', locale = null) {
   const numericAmount = isNaN(amount) || !isFinite(amount) ? 0 : amount;
   const targetLocale = locale || getDefaultLocale(currency);
 
   try {
     return new Intl.NumberFormat(targetLocale, {
       style: 'currency',
-      currency: currency.toUpperCase(),
-      maximumFractionDigits: currency.toUpperCase() === 'JPY' ? 0 : 2
+      currency: (currency || 'INR').toUpperCase(),
+      maximumFractionDigits: (currency || 'INR').toUpperCase() === 'JPY' ? 0 : 2
     }).format(numericAmount);
   } catch (_) {
-    // Fallback in case of custom/unsupported currency codes
-    const symbol = currency.toUpperCase() === 'INR' ? '₹' : '$';
+    const symbol = (currency || 'INR').toUpperCase() === 'INR' ? '₹' : '$';
     return `${symbol}${numericAmount.toFixed(2)}`;
   }
 }
-
-
