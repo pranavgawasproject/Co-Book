@@ -178,4 +178,87 @@ export function formatCurrency(amount: number, currency = 'USD', locale?: string
   }
 }
 
+export function calculateMultiCurrencyConversion(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string,
+  exchangeRates: Record<string, number> = {}
+): number {
+  if (isNaN(amount) || amount <= 0 || !fromCurrency || !toCurrency) return 0;
+  const from = fromCurrency.toUpperCase();
+  const to = toCurrency.toUpperCase();
+  if (from === to) return amount;
+
+  // Defaults relative to USD
+  const defaultRates: Record<string, number> = {
+    USD: 1.0,
+    EUR: 0.92,
+    GBP: 0.78,
+    INR: 83.5,
+    JPY: 155.0,
+    CAD: 1.36,
+    AUD: 1.50
+  };
+
+  const rates = { ...defaultRates, ...exchangeRates };
+  const fromRate = rates[from];
+  const toRate = rates[to];
+
+  if (!fromRate || !toRate) return 0;
+  const amountInUSD = amount / fromRate;
+  const converted = amountInUSD * toRate;
+  return Math.round(converted * 100) / 100;
+}
+
+export interface SimplifiedTransaction {
+  from: string;
+  to: string;
+  amount: number;
+}
+
+export function simplifyGroupBalances(
+  netBalances: { member: string; netAmount: number }[]
+): SimplifiedTransaction[] {
+  if (!Array.isArray(netBalances) || netBalances.length === 0) return [];
+
+  const debtors: { member: string; amount: number }[] = [];
+  const creditors: { member: string; amount: number }[] = [];
+
+  for (const item of netBalances) {
+    const rounded = Math.round(item.netAmount * 100) / 100;
+    if (rounded < 0) {
+      debtors.push({ member: item.member, amount: Math.abs(rounded) });
+    } else if (rounded > 0) {
+      creditors.push({ member: item.member, amount: rounded });
+    }
+  }
+
+  const transactions: SimplifiedTransaction[] = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < debtors.length && j < creditors.length) {
+    const debtor = debtors[i];
+    const creditor = creditors[j];
+    const settlement = Math.min(debtor.amount, creditor.amount);
+
+    if (settlement > 0) {
+      transactions.push({
+        from: debtor.member,
+        to: creditor.member,
+        amount: Math.round(settlement * 100) / 100
+      });
+    }
+
+    debtor.amount -= settlement;
+    creditor.amount -= settlement;
+
+    if (Math.round(debtor.amount * 100) === 0) i++;
+    if (Math.round(creditor.amount * 100) === 0) j++;
+  }
+
+  return transactions;
+}
+
+
 

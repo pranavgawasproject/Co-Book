@@ -4,7 +4,9 @@ import {
   calculateEqualShares,
   calculatePercentageSplit,
   calculateWeightedSplit,
-  formatCurrency
+  formatCurrency,
+  calculateMultiCurrencyConversion,
+  simplifyGroupBalances
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -114,4 +116,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(formatCurrency(Infinity, 'INR')).toMatch(/₹\s?0(\.00)?/);
     });
   });
+
+  describe('calculateMultiCurrencyConversion', () => {
+    test('should convert currencies accurately using standard rates', () => {
+      expect(calculateMultiCurrencyConversion(100, 'USD', 'USD')).toBe(100);
+      expect(calculateMultiCurrencyConversion(100, 'USD', 'INR')).toBe(8350);
+      expect(calculateMultiCurrencyConversion(0, 'USD', 'EUR')).toBe(0);
+    });
+  });
+
+  describe('simplifyGroupBalances', () => {
+    test('should simplify net balances into minimal transactions', () => {
+      const netBalances = [
+        { member: 'Alice', netAmount: -50 },
+        { member: 'Bob', netAmount: -30 },
+        { member: 'Charlie', netAmount: 80 }
+      ];
+      const transactions = simplifyGroupBalances(netBalances);
+      expect(transactions).toEqual([
+        { from: 'Alice', to: 'Charlie', amount: 50 },
+        { from: 'Bob', to: 'Charlie', amount: 30 }
+      ]);
+    });
+  });
 });
+
