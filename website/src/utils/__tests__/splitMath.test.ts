@@ -8,7 +8,9 @@ import {
   calculateMultiCurrencyConversion,
   simplifyGroupBalances,
   validateGroupSplitInput,
-  calculateTipAndTaxDistributions
+  calculateTipAndTaxDistributions,
+  generateCollaborativeSessionToken,
+  calculateCategorySpendingBreakdown
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {

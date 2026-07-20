@@ -299,6 +299,33 @@ export function calculateTipAndTaxDistributions(
   return { sharesWithTaxTip, total };
 }
 
+export function generateCollaborativeSessionToken(tripId: string, userId: string): string {
+  if (!tripId || !userId || typeof tripId !== 'string' || typeof userId !== 'string') {
+    return '';
+  }
+  const cleanTrip = tripId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanUser = userId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!cleanTrip || !cleanUser) return '';
+  return `sync_${cleanTrip}_${cleanUser}`;
+}
+
+export function calculateCategorySpendingBreakdown(
+  expenses: Array<{ category?: string; amount?: number }>
+): Record<string, number> {
+  if (!Array.isArray(expenses)) return {};
+  const breakdown: Record<string, number> = {};
+
+  for (const exp of expenses) {
+    if (!exp) continue;
+    const cat = (exp.category && exp.category.trim()) || 'General';
+    const amt = typeof exp.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    breakdown[cat] = Math.round(((breakdown[cat] || 0) + amt) * 100) / 100;
+  }
+
+  return breakdown;
+}
+
+
 
 
 
