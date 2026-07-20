@@ -325,6 +325,28 @@ export function calculateCategorySpendingBreakdown(
   return breakdown;
 }
 
+export function calculateBudgetPerPersonCap(
+  totalBudget: number,
+  memberCount: number,
+  maxCapPerPerson?: number
+): { perPersonBudget: number; exceedsCap: boolean; excessPerPerson: number } {
+  if (typeof totalBudget !== 'number' || isNaN(totalBudget) || totalBudget <= 0 ||
+      typeof memberCount !== 'number' || isNaN(memberCount) || memberCount <= 0) {
+    return { perPersonBudget: 0, exceedsCap: false, excessPerPerson: 0 };
+  }
+
+  const perPersonBudget = Math.round((totalBudget / memberCount) * 100) / 100;
+  if (typeof maxCapPerPerson !== 'number' || isNaN(maxCapPerPerson) || maxCapPerPerson <= 0) {
+    return { perPersonBudget, exceedsCap: false, excessPerPerson: 0 };
+  }
+
+  const exceedsCap = perPersonBudget > maxCapPerPerson;
+  const excessPerPerson = exceedsCap ? Math.round((perPersonBudget - maxCapPerPerson) * 100) / 100 : 0;
+
+  return { perPersonBudget, exceedsCap, excessPerPerson };
+}
+
+
 
 
 

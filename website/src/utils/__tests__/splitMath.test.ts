@@ -10,7 +10,8 @@ import {
   validateGroupSplitInput,
   calculateTipAndTaxDistributions,
   generateCollaborativeSessionToken,
-  calculateCategorySpendingBreakdown
+  calculateCategorySpendingBreakdown,
+  calculateBudgetPerPersonCap
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -171,7 +172,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.sharesWithTaxTip).toEqual([0, 0]);
     });
   });
+
+  describe('calculateBudgetPerPersonCap', () => {
+    test('calculates per person budget and cap status', () => {
+      const ok = calculateBudgetPerPersonCap(300, 3, 150);
+      expect(ok.perPersonBudget).toBe(100);
+      expect(ok.exceedsCap).toBe(false);
+      expect(ok.excessPerPerson).toBe(0);
+
+      const excess = calculateBudgetPerPersonCap(600, 3, 150);
+      expect(excess.perPersonBudget).toBe(200);
+      expect(excess.exceedsCap).toBe(true);
+      expect(excess.excessPerPerson).toBe(50);
+    });
+
+    test('handles invalid inputs gracefully', () => {
+      const res = calculateBudgetPerPersonCap(0, 3);
+      expect(res.perPersonBudget).toBe(0);
+      expect(res.exceedsCap).toBe(false);
+    });
+  });
 });
+
 
 
 
