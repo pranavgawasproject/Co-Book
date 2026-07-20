@@ -260,5 +260,22 @@ export function simplifyGroupBalances(
   return transactions;
 }
 
+export function validateGroupSplitInput(totalAmount: number, memberNames: string[]): { isValid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  if (typeof totalAmount !== 'number' || isNaN(totalAmount) || totalAmount <= 0) {
+    errors.push('Total amount must be greater than zero');
+  }
+  if (!Array.isArray(memberNames) || memberNames.length < 2) {
+    errors.push('At least two group members are required to split');
+  } else {
+    const emptyNames = memberNames.filter(n => !n || !n.trim());
+    if (emptyNames.length > 0) {
+      errors.push('Member names cannot be empty');
+    }
+  }
+  return { isValid: errors.length === 0, errors };
+}
+
+
 
 

@@ -6,7 +6,8 @@ import {
   calculateWeightedSplit,
   formatCurrency,
   calculateMultiCurrencyConversion,
-  simplifyGroupBalances
+  simplifyGroupBalances,
+  validateGroupSplitInput
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -139,5 +140,20 @@ describe('Co-Book Split Math Utility', () => {
       ]);
     });
   });
+
+  describe('validateGroupSplitInput', () => {
+    test('validates valid total amount and member names', () => {
+      const res = validateGroupSplitInput(150, ['Alice', 'Bob']);
+      expect(res.isValid).toBe(true);
+      expect(res.errors).toHaveLength(0);
+    });
+
+    test('flags invalid amounts or missing members', () => {
+      const res = validateGroupSplitInput(0, ['Alice']);
+      expect(res.isValid).toBe(false);
+      expect(res.errors.length).toBeGreaterThan(0);
+    });
+  });
 });
+
 
