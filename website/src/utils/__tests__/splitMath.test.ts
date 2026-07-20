@@ -7,7 +7,8 @@ import {
   formatCurrency,
   calculateMultiCurrencyConversion,
   simplifyGroupBalances,
-  validateGroupSplitInput
+  validateGroupSplitInput,
+  calculateTipAndTaxDistributions
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -154,6 +155,21 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.errors.length).toBeGreaterThan(0);
     });
   });
+
+  describe('calculateTipAndTaxDistributions', () => {
+    test('proportonally calculates tax and tip on base shares', () => {
+      const res = calculateTipAndTaxDistributions(100, 10, 10, [60, 40]);
+      expect(res.total).toBe(120);
+      expect(res.sharesWithTaxTip).toEqual([72, 48]);
+    });
+
+    test('handles zero or invalid base amount gracefully', () => {
+      const res = calculateTipAndTaxDistributions(0, 5, 5, [10, 20]);
+      expect(res.total).toBe(0);
+      expect(res.sharesWithTaxTip).toEqual([0, 0]);
+    });
+  });
 });
+
 
 

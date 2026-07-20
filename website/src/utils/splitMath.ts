@@ -276,6 +276,30 @@ export function validateGroupSplitInput(totalAmount: number, memberNames: string
   return { isValid: errors.length === 0, errors };
 }
 
+export function calculateTipAndTaxDistributions(
+  baseAmount: number,
+  taxAmount: number,
+  tipAmount: number,
+  memberShares: number[]
+): { sharesWithTaxTip: number[]; total: number } {
+  if (baseAmount <= 0 || !Array.isArray(memberShares) || memberShares.length === 0) {
+    return { sharesWithTaxTip: (memberShares || []).map(() => 0), total: 0 };
+  }
+  const tax = Math.max(0, isNaN(taxAmount) ? 0 : taxAmount);
+  const tip = Math.max(0, isNaN(tipAmount) ? 0 : tipAmount);
+  const totalBill = baseAmount + tax + tip;
+  const ratio = totalBill / baseAmount;
+
+  const sharesWithTaxTip = memberShares.map(share => {
+    const s = Math.max(0, isNaN(share) ? 0 : share);
+    return Math.round(s * ratio * 100) / 100;
+  });
+
+  const total = Math.round(totalBill * 100) / 100;
+  return { sharesWithTaxTip, total };
+}
+
+
 
 
 
