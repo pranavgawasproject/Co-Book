@@ -13,7 +13,8 @@ import {
   calculateCategorySpendingBreakdown,
   calculateBudgetPerPersonCap,
   calculateGroupBudgetVelocity,
-  calculateGroupSettleUpPlan
+  calculateGroupSettleUpPlan,
+  calculateGroupExpenseFairnessIndex
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -237,7 +238,24 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.transactions).toHaveLength(0);
     });
   });
+
+  describe('calculateGroupExpenseFairnessIndex', () => {
+    test('calculates fairness index, rating, top payer and ower correctly', () => {
+      const balances = { Alice: 150, Bob: -100, Charlie: -50 };
+      const res = calculateGroupExpenseFairnessIndex(balances);
+      expect(res.fairnessScore).toBeLessThan(100);
+      expect(res.topPayer).toBe('Alice');
+      expect(res.topOwer).toBe('Bob');
+    });
+
+    test('returns 100 score for balanced group', () => {
+      const res = calculateGroupExpenseFairnessIndex({ Alice: 0, Bob: 0 });
+      expect(res.fairnessScore).toBe(100);
+      expect(res.rating).toBe('Highly Balanced');
+    });
+  });
 });
+
 
 
 

@@ -419,6 +419,59 @@ export function calculateGroupSettleUpPlan(
   };
 }
 
+export function calculateGroupExpenseFairnessIndex(
+  balances: Record<string, number>
+): {
+  fairnessScore: number;
+  rating: 'Highly Balanced' | 'Slightly Disproportionate' | 'Highly Unbalanced';
+  topPayer: string;
+  topOwer: string;
+} {
+  const entries = Object.entries(balances || {});
+  if (entries.length === 0) {
+    return { fairnessScore: 100, rating: 'Highly Balanced', topPayer: '', topOwer: '' };
+  }
+
+  let maxNet = -Infinity;
+  let minNet = Infinity;
+  let topPayer = '';
+  let topOwer = '';
+  let totalAbsNet = 0;
+
+  for (const [member, net] of entries) {
+    const val = typeof net === 'number' && !isNaN(net) ? net : 0;
+    totalAbsNet += Math.abs(val);
+    if (val > maxNet) {
+      maxNet = val;
+      topPayer = member;
+    }
+    if (val < minNet) {
+      minNet = val;
+      topOwer = member;
+    }
+  }
+
+  // Calculate fairness index based on total imbalance relative to group size
+  const avgImbalancePerPerson = totalAbsNet / entries.length;
+  const rawScore = Math.max(0, 100 - Math.round(avgImbalancePerPerson * 0.5));
+  const fairnessScore = Math.min(100, rawScore);
+
+  let rating: 'Highly Balanced' | 'Slightly Disproportionate' | 'Highly Unbalanced' = 'Highly Balanced';
+  if (fairnessScore < 60) {
+    rating = 'Highly Unbalanced';
+  } else if (fairnessScore < 85) {
+    rating = 'Slightly Disproportionate';
+  }
+
+  return {
+    fairnessScore,
+    rating,
+    topPayer: maxNet > 0 ? topPayer : '',
+    topOwer: minNet < 0 ? topOwer : ''
+  };
+}
+
+
 
 
 
