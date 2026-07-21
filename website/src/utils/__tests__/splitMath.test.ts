@@ -14,8 +14,10 @@ import {
   calculateBudgetPerPersonCap,
   calculateGroupBudgetVelocity,
   calculateGroupSettleUpPlan,
-  calculateGroupExpenseFairnessIndex
+  calculateGroupExpenseFairnessIndex,
+  calculateGroupDepositEscrowShares
 } from '../splitMath';
+
 
 describe('Co-Book Split Math Utility', () => {
   describe('calculateEqualSplit', () => {
@@ -254,7 +256,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.rating).toBe('Highly Balanced');
     });
   });
+
+  describe('calculateGroupDepositEscrowShares', () => {
+    test('calculates deposit share and damage deductions per person', () => {
+      const damages = [{ amount: 120 }];
+      const res = calculateGroupDepositEscrowShares(damages, 600, 3);
+      expect(res.perPersonDeposit).toBe(200);
+      expect(res.deductedDamagePerPerson).toBe(40);
+      expect(res.remainingRefundablePerPerson).toBe(160);
+    });
+
+    test('handles zero damages and invalid inputs gracefully', () => {
+      const res = calculateGroupDepositEscrowShares([], 300, 3);
+      expect(res.perPersonDeposit).toBe(100);
+      expect(res.deductedDamagePerPerson).toBe(0);
+      expect(res.remainingRefundablePerPerson).toBe(100);
+
+      const invalid = calculateGroupDepositEscrowShares([], 0, 0);
+      expect(invalid.perPersonDeposit).toBe(0);
+    });
+  });
 });
+
 
 
 

@@ -471,6 +471,45 @@ export function calculateGroupExpenseFairnessIndex(
   };
 }
 
+export function calculateGroupDepositEscrowShares(
+  expenses: Array<{ amount?: number }>,
+  depositTotal: number,
+  memberCount: number
+): {
+  perPersonDeposit: number;
+  totalDeposit: number;
+  remainingRefundablePerPerson: number;
+  deductedDamagePerPerson: number;
+} {
+  if (
+    typeof depositTotal !== 'number' ||
+    isNaN(depositTotal) ||
+    depositTotal <= 0 ||
+    typeof memberCount !== 'number' ||
+    isNaN(memberCount) ||
+    memberCount <= 0
+  ) {
+    return { perPersonDeposit: 0, totalDeposit: 0, remainingRefundablePerPerson: 0, deductedDamagePerPerson: 0 };
+  }
+
+  const perPersonDeposit = Math.round((depositTotal / memberCount) * 100) / 100;
+  const totalDamages = (Array.isArray(expenses) ? expenses : []).reduce((sum, exp) => {
+    const amt = typeof exp?.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    return sum + amt;
+  }, 0);
+
+  const damagePerPerson = Math.min(perPersonDeposit, Math.round((totalDamages / memberCount) * 100) / 100);
+  const remainingRefundablePerPerson = Math.max(0, Math.round((perPersonDeposit - damagePerPerson) * 100) / 100);
+
+  return {
+    perPersonDeposit,
+    totalDeposit: Math.round(depositTotal * 100) / 100,
+    remainingRefundablePerPerson,
+    deductedDamagePerPerson: damagePerPerson
+  };
+}
+
+
 
 
 
