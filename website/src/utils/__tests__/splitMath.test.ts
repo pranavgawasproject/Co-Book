@@ -11,7 +11,8 @@ import {
   calculateTipAndTaxDistributions,
   generateCollaborativeSessionToken,
   calculateCategorySpendingBreakdown,
-  calculateBudgetPerPersonCap
+  calculateBudgetPerPersonCap,
+  calculateGroupBudgetVelocity
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -192,7 +193,33 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.exceedsCap).toBe(false);
     });
   });
+
+  describe('calculateGroupBudgetVelocity', () => {
+    test('calculates burn rate and projected total correctly', () => {
+      const expenses = [{ amount: 150 }, { amount: 250 }];
+      const res = calculateGroupBudgetVelocity(expenses, 1000, 4, 10);
+      expect(res.dailyBurnRate).toBe(100);
+      expect(res.projectedTotalSpend).toBe(1000);
+      expect(res.isOverBudget).toBe(false);
+      expect(res.budgetUtilizationPercentage).toBe(40);
+    });
+
+    test('flags over-budget scenario when velocity exceeds total budget', () => {
+      const expenses = [{ amount: 600 }];
+      const res = calculateGroupBudgetVelocity(expenses, 1000, 3, 10);
+      expect(res.dailyBurnRate).toBe(200);
+      expect(res.projectedTotalSpend).toBe(2000);
+      expect(res.isOverBudget).toBe(true);
+    });
+
+    test('handles invalid inputs gracefully', () => {
+      const res = calculateGroupBudgetVelocity([], 0, 0, 0);
+      expect(res.dailyBurnRate).toBe(0);
+      expect(res.isOverBudget).toBe(false);
+    });
+  });
 });
+
 
 
 

@@ -346,6 +346,56 @@ export function calculateBudgetPerPersonCap(
   return { perPersonBudget, exceedsCap, excessPerPerson };
 }
 
+export function calculateGroupBudgetVelocity(
+  expenses: Array<{ amount?: number }>,
+  totalBudget: number,
+  elapsedDays: number,
+  totalTripDays: number
+): {
+  dailyBurnRate: number;
+  projectedTotalSpend: number;
+  isOverBudget: boolean;
+  budgetUtilizationPercentage: number;
+} {
+  if (
+    !Array.isArray(expenses) ||
+    typeof totalBudget !== 'number' ||
+    isNaN(totalBudget) ||
+    totalBudget <= 0 ||
+    typeof elapsedDays !== 'number' ||
+    isNaN(elapsedDays) ||
+    elapsedDays <= 0 ||
+    typeof totalTripDays !== 'number' ||
+    isNaN(totalTripDays) ||
+    totalTripDays <= 0
+  ) {
+    return {
+      dailyBurnRate: 0,
+      projectedTotalSpend: 0,
+      isOverBudget: false,
+      budgetUtilizationPercentage: 0
+    };
+  }
+
+  const totalSpent = expenses.reduce((sum, exp) => {
+    const amt = typeof exp?.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    return sum + amt;
+  }, 0);
+
+  const dailyBurnRate = Math.round((totalSpent / elapsedDays) * 100) / 100;
+  const projectedTotalSpend = Math.round(dailyBurnRate * totalTripDays * 100) / 100;
+  const isOverBudget = projectedTotalSpend > totalBudget;
+  const budgetUtilizationPercentage = Math.round((totalSpent / totalBudget) * 100 * 10) / 10;
+
+  return {
+    dailyBurnRate,
+    projectedTotalSpend,
+    isOverBudget,
+    budgetUtilizationPercentage
+  };
+}
+
+
 
 
 
