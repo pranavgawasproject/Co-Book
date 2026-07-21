@@ -12,7 +12,8 @@ import {
   generateCollaborativeSessionToken,
   calculateCategorySpendingBreakdown,
   calculateBudgetPerPersonCap,
-  calculateGroupBudgetVelocity
+  calculateGroupBudgetVelocity,
+  calculateGroupSettleUpPlan
 } from '../splitMath';
 
 describe('Co-Book Split Math Utility', () => {
@@ -216,6 +217,24 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupBudgetVelocity([], 0, 0, 0);
       expect(res.dailyBurnRate).toBe(0);
       expect(res.isOverBudget).toBe(false);
+    });
+  });
+
+  describe('calculateGroupSettleUpPlan', () => {
+    test('generates settle up transactions and total settlement volume', () => {
+      const balances = { Alice: -50, Bob: 50 };
+      const res = calculateGroupSettleUpPlan(balances);
+      expect(res.isSettled).toBe(false);
+      expect(res.totalVolume).toBe(50);
+      expect(res.transactions).toEqual([{ from: 'Alice', to: 'Bob', amount: 50 }]);
+    });
+
+    test('returns settled status when all balances are zero', () => {
+      const balances = { Alice: 0, Bob: 0 };
+      const res = calculateGroupSettleUpPlan(balances);
+      expect(res.isSettled).toBe(true);
+      expect(res.totalVolume).toBe(0);
+      expect(res.transactions).toHaveLength(0);
     });
   });
 });

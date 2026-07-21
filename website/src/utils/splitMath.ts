@@ -395,6 +395,30 @@ export function calculateGroupBudgetVelocity(
   };
 }
 
+export function calculateGroupSettleUpPlan(
+  balances: Record<string, number>
+): { transactions: SimplifiedTransaction[]; totalVolume: number; isSettled: boolean } {
+  if (!balances || typeof balances !== 'object') {
+    return { transactions: [], totalVolume: 0, isSettled: true };
+  }
+
+  const netBalances = Object.entries(balances).map(([member, netAmount]) => ({
+    member,
+    netAmount: typeof netAmount === 'number' && !isNaN(netAmount) ? netAmount : 0
+  }));
+
+  const transactions = simplifyGroupBalances(netBalances);
+  const totalVolume = Math.round(
+    transactions.reduce((sum, tx) => sum + tx.amount, 0) * 100
+  ) / 100;
+
+  return {
+    transactions,
+    totalVolume,
+    isSettled: transactions.length === 0
+  };
+}
+
 
 
 
