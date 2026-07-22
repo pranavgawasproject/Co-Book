@@ -605,3 +605,51 @@ export function calculateGroupCustomRatioSplit(
   };
 }
 
+export function calculateCoBookingDiscountShare(
+  totalOrderAmount: number,
+  discountPercentage: number,
+  participantCount: number
+): {
+  valid: boolean;
+  totalOrderAmount: number;
+  totalDiscountAmount: number;
+  netOrderAmount: number;
+  perPersonOriginalShare: number;
+  perPersonDiscountShare: number;
+  perPersonNetPayable: number;
+} {
+  if (
+    typeof totalOrderAmount !== 'number' || isNaN(totalOrderAmount) || totalOrderAmount <= 0 ||
+    typeof participantCount !== 'number' || isNaN(participantCount) || participantCount <= 0
+  ) {
+    return {
+      valid: false,
+      totalOrderAmount: 0,
+      totalDiscountAmount: 0,
+      netOrderAmount: 0,
+      perPersonOriginalShare: 0,
+      perPersonDiscountShare: 0,
+      perPersonNetPayable: 0
+    };
+  }
+
+  const pct = typeof discountPercentage === 'number' && !isNaN(discountPercentage) ? Math.max(0, Math.min(100, discountPercentage)) : 0;
+  const count = Math.max(1, Math.floor(participantCount));
+
+  const totalDiscountAmount = Math.round((totalOrderAmount * (pct / 100)) * 100) / 100;
+  const netOrderAmount = Math.round((totalOrderAmount - totalDiscountAmount) * 100) / 100;
+
+  const perPersonOriginalShare = Math.round((totalOrderAmount / count) * 100) / 100;
+  const perPersonDiscountShare = Math.round((totalDiscountAmount / count) * 100) / 100;
+  const perPersonNetPayable = Math.round((netOrderAmount / count) * 100) / 100;
+
+  return {
+    valid: true,
+    totalOrderAmount,
+    totalDiscountAmount,
+    netOrderAmount,
+    perPersonOriginalShare,
+    perPersonDiscountShare,
+    perPersonNetPayable
+  };
+}

@@ -18,7 +18,8 @@ import {
   calculateGroupDepositEscrowShares,
   calculateGroupFlightSeatUpgradeShare,
   calculateTripCurrencyConversionRate,
-  calculateGroupCustomRatioSplit
+  calculateGroupCustomRatioSplit,
+  calculateCoBookingDiscountShare
 } from '../splitMath';
 
 
@@ -329,6 +330,25 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupCustomRatioSplit(100, []);
       expect(res.shares).toEqual([]);
       expect(res.remainderCents).toBe(0);
+    });
+  });
+
+  describe('calculateCoBookingDiscountShare', () => {
+    test('calculates coupon discount distribution and per person net payable accurately', () => {
+      const res = calculateCoBookingDiscountShare(200, 10, 4);
+      expect(res.valid).toBe(true);
+      expect(res.totalOrderAmount).toBe(200);
+      expect(res.totalDiscountAmount).toBe(20);
+      expect(res.netOrderAmount).toBe(180);
+      expect(res.perPersonOriginalShare).toBe(50);
+      expect(res.perPersonDiscountShare).toBe(5);
+      expect(res.perPersonNetPayable).toBe(45);
+    });
+
+    test('returns invalid state for invalid order total or participant count', () => {
+      const res = calculateCoBookingDiscountShare(0, 10, 0);
+      expect(res.valid).toBe(false);
+      expect(res.netOrderAmount).toBe(0);
     });
   });
 });
