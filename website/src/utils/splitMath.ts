@@ -509,12 +509,61 @@ export function calculateGroupDepositEscrowShares(
   };
 }
 
+export function calculateGroupFlightSeatUpgradeShare(
+  baseFlightTotal: number,
+  upgradeFeeTotal: number,
+  totalMembers: number,
+  upgradedMemberCount: number
+): {
+  basePerPerson: number;
+  upgradedPerPerson: number;
+  totalFlightCost: number;
+} {
+  if (
+    typeof baseFlightTotal !== 'number' || isNaN(baseFlightTotal) || baseFlightTotal <= 0 ||
+    typeof totalMembers !== 'number' || isNaN(totalMembers) || totalMembers <= 0
+  ) {
+    return { basePerPerson: 0, upgradedPerPerson: 0, totalFlightCost: 0 };
+  }
 
+  const basePerPerson = Math.round((baseFlightTotal / totalMembers) * 100) / 100;
+  const upgradeFee = typeof upgradeFeeTotal === 'number' && !isNaN(upgradeFeeTotal) && upgradeFeeTotal > 0 ? upgradeFeeTotal : 0;
+  const optInCount = typeof upgradedMemberCount === 'number' && upgradedMemberCount > 0 ? Math.min(upgradedMemberCount, totalMembers) : 0;
 
+  const upgradePerOptIn = optInCount > 0 ? Math.round((upgradeFee / optInCount) * 100) / 100 : 0;
+  const upgradedPerPerson = Math.round((basePerPerson + upgradePerOptIn) * 100) / 100;
 
+  return {
+    basePerPerson,
+    upgradedPerPerson,
+    totalFlightCost: Math.round((baseFlightTotal + upgradeFee) * 100) / 100
+  };
+}
 
+export function calculateTripCurrencyConversionRate(
+  amount: number,
+  exchangeRate: number,
+  platformFeePercentage: number = 0
+): {
+  convertedAmount: number;
+  platformFeeAmount: number;
+  finalTotal: number;
+} {
+  if (
+    typeof amount !== 'number' || isNaN(amount) || amount <= 0 ||
+    typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0
+  ) {
+    return { convertedAmount: 0, platformFeeAmount: 0, finalTotal: 0 };
+  }
 
+  const convertedAmount = Math.round(amount * exchangeRate * 100) / 100;
+  const feeRate = typeof platformFeePercentage === 'number' && platformFeePercentage > 0 ? platformFeePercentage / 100 : 0;
+  const platformFeeAmount = Math.round(convertedAmount * feeRate * 100) / 100;
+  const finalTotal = Math.round((convertedAmount + platformFeeAmount) * 100) / 100;
 
-
-
-
+  return {
+    convertedAmount,
+    platformFeeAmount,
+    finalTotal
+  };
+}

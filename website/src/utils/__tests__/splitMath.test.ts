@@ -15,7 +15,9 @@ import {
   calculateGroupBudgetVelocity,
   calculateGroupSettleUpPlan,
   calculateGroupExpenseFairnessIndex,
-  calculateGroupDepositEscrowShares
+  calculateGroupDepositEscrowShares,
+  calculateGroupFlightSeatUpgradeShare,
+  calculateTripCurrencyConversionRate
 } from '../splitMath';
 
 
@@ -274,6 +276,40 @@ describe('Co-Book Split Math Utility', () => {
 
       const invalid = calculateGroupDepositEscrowShares([], 0, 0);
       expect(invalid.perPersonDeposit).toBe(0);
+    });
+  });
+
+  describe('calculateGroupFlightSeatUpgradeShare', () => {
+    test('calculates flight cost per person for base vs upgraded members', () => {
+      const res = calculateGroupFlightSeatUpgradeShare(1200, 300, 4, 2);
+      expect(res.basePerPerson).toBe(300);
+      expect(res.upgradedPerPerson).toBe(450);
+      expect(res.totalFlightCost).toBe(1500);
+    });
+
+    test('handles zero upgrade fee or invalid input gracefully', () => {
+      const res = calculateGroupFlightSeatUpgradeShare(800, 0, 4, 0);
+      expect(res.basePerPerson).toBe(200);
+      expect(res.upgradedPerPerson).toBe(200);
+      expect(res.totalFlightCost).toBe(800);
+
+      const invalid = calculateGroupFlightSeatUpgradeShare(0, 0, 0, 0);
+      expect(invalid.basePerPerson).toBe(0);
+    });
+  });
+
+  describe('calculateTripCurrencyConversionRate', () => {
+    test('converts amount and computes platform fee', () => {
+      const res = calculateTripCurrencyConversionRate(100, 1.2, 2.5);
+      expect(res.convertedAmount).toBe(120);
+      expect(res.platformFeeAmount).toBe(3);
+      expect(res.finalTotal).toBe(123);
+    });
+
+    test('handles invalid inputs safely', () => {
+      const res = calculateTripCurrencyConversionRate(-50, 0);
+      expect(res.convertedAmount).toBe(0);
+      expect(res.finalTotal).toBe(0);
     });
   });
 });
