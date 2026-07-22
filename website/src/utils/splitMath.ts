@@ -567,3 +567,41 @@ export function calculateTripCurrencyConversionRate(
     finalTotal
   };
 }
+
+export function calculateGroupCustomRatioSplit(
+  totalAmount: number,
+  ratios: number[]
+): { shares: number[]; remainderCents: number } {
+  if (totalAmount <= 0 || !Array.isArray(ratios) || ratios.length === 0) {
+    return { shares: (ratios || []).map(() => 0), remainderCents: 0 };
+  }
+
+  const validRatios = ratios.map(r => (isNaN(r) || !isFinite(r) ? 0 : Math.max(0, r)));
+  const totalRatio = validRatios.reduce((sum, r) => sum + r, 0);
+
+  if (totalRatio <= 0) {
+    return { shares: ratios.map(() => 0), remainderCents: 0 };
+  }
+
+  const totalCents = Math.round(totalAmount * 100);
+  let allocatedCents = 0;
+  const sharesInCents = validRatios.map(r => {
+    const cents = Math.floor((totalCents * r) / totalRatio);
+    allocatedCents += cents;
+    return cents;
+  });
+
+  let remainderCents = totalCents - allocatedCents;
+  for (let i = 0; i < sharesInCents.length && remainderCents > 0; i++) {
+    if (validRatios[i] > 0) {
+      sharesInCents[i] += 1;
+      remainderCents -= 1;
+    }
+  }
+
+  return {
+    shares: sharesInCents.map(c => c / 100),
+    remainderCents: remainderCents / 100
+  };
+}
+

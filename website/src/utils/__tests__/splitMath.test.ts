@@ -17,8 +17,10 @@ import {
   calculateGroupExpenseFairnessIndex,
   calculateGroupDepositEscrowShares,
   calculateGroupFlightSeatUpgradeShare,
-  calculateTripCurrencyConversionRate
+  calculateTripCurrencyConversionRate,
+  calculateGroupCustomRatioSplit
 } from '../splitMath';
+
 
 
 describe('Co-Book Split Math Utility', () => {
@@ -312,7 +314,25 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.finalTotal).toBe(0);
     });
   });
+
+  describe('calculateGroupCustomRatioSplit', () => {
+    test('splits amount according to custom numerical ratio', () => {
+      const res = calculateGroupCustomRatioSplit(100, [3, 2, 1]);
+      expect(res.shares[0] + res.shares[1] + res.shares[2]).toBe(100);
+      expect(res.shares[0]).toBe(50.01);
+      expect(res.shares[1]).toBe(33.33);
+      expect(res.shares[2]).toBe(16.66);
+
+    });
+
+    test('handles invalid or empty ratios gracefully', () => {
+      const res = calculateGroupCustomRatioSplit(100, []);
+      expect(res.shares).toEqual([]);
+      expect(res.remainderCents).toBe(0);
+    });
+  });
 });
+
 
 
 
