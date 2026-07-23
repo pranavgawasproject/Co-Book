@@ -20,7 +20,8 @@ import {
   calculateTripCurrencyConversionRate,
   calculateGroupCustomRatioSplit,
   calculateCoBookingDiscountShare,
-  calculateGroupFlightVsHotelSplitRatio
+  calculateGroupFlightVsHotelSplitRatio,
+  calculateGroupTravelCurrencyConversionSplit
 } from '../splitMath';
 
 
@@ -369,6 +370,23 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupFlightVsHotelSplitRatio(0, 0, 0);
       expect(res.valid).toBe(false);
       expect(res.totalBookingCost).toBe(0);
+    });
+  });
+
+  describe('calculateGroupTravelCurrencyConversionSplit', () => {
+    test('calculates foreign currency conversion, service fees and per person share', () => {
+      const res = calculateGroupTravelCurrencyConversionSplit(100, 1.2, 2.5, 4);
+      expect(res.valid).toBe(true);
+      expect(res.totalHomeCurrencyAmount).toBe(120);
+      expect(res.totalFeeAmount).toBe(3);
+      expect(res.netPayableHomeCurrency).toBe(123);
+      expect(res.perPersonShareHomeCurrency).toBe(30.75);
+    });
+
+    test('handles zero or invalid foreign amount gracefully', () => {
+      const res = calculateGroupTravelCurrencyConversionSplit(0, 1.2);
+      expect(res.valid).toBe(false);
+      expect(res.netPayableHomeCurrency).toBe(0);
     });
   });
 });

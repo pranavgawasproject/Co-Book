@@ -702,3 +702,45 @@ export function calculateGroupFlightVsHotelSplitRatio(
   };
 }
 
+export function calculateGroupTravelCurrencyConversionSplit(
+  amountForeignCurrency: number,
+  exchangeRate: number,
+  serviceFeePercentage: number = 2.5,
+  participantCount: number = 1
+): {
+  valid: boolean;
+  totalHomeCurrencyAmount: number;
+  totalFeeAmount: number;
+  netPayableHomeCurrency: number;
+  perPersonShareHomeCurrency: number;
+} {
+  const foreign = typeof amountForeignCurrency === 'number' && !isNaN(amountForeignCurrency) && amountForeignCurrency > 0 ? amountForeignCurrency : 0;
+  const rate = typeof exchangeRate === 'number' && !isNaN(exchangeRate) && exchangeRate > 0 ? exchangeRate : 0;
+  const feePct = typeof serviceFeePercentage === 'number' && !isNaN(serviceFeePercentage) && serviceFeePercentage >= 0 ? serviceFeePercentage : 2.5;
+  const count = typeof participantCount === 'number' && !isNaN(participantCount) && participantCount > 0 ? Math.floor(participantCount) : 1;
+
+  if (foreign === 0 || rate === 0) {
+    return {
+      valid: false,
+      totalHomeCurrencyAmount: 0,
+      totalFeeAmount: 0,
+      netPayableHomeCurrency: 0,
+      perPersonShareHomeCurrency: 0
+    };
+  }
+
+  const baseConverted = foreign * rate;
+  const fee = baseConverted * (feePct / 100);
+  const totalHome = Math.round((baseConverted + fee) * 100) / 100;
+  const perPerson = Math.round((totalHome / count) * 100) / 100;
+
+  return {
+    valid: true,
+    totalHomeCurrencyAmount: Math.round(baseConverted * 100) / 100,
+    totalFeeAmount: Math.round(fee * 100) / 100,
+    netPayableHomeCurrency: totalHome,
+    perPersonShareHomeCurrency: perPerson
+  };
+}
+
+
