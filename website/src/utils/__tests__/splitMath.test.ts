@@ -22,8 +22,10 @@ import {
   calculateCoBookingDiscountShare,
   calculateGroupFlightVsHotelSplitRatio,
   calculateGroupTravelCurrencyConversionSplit,
-  calculateMultiplayerSyncSessionState
+  calculateMultiplayerSyncSessionState,
+  calculateGroupFlightPriceAlertThreshold
 } from '../splitMath';
+
 
 
 
@@ -424,7 +426,26 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.isReadyToBook).toBe(false);
     });
   });
+
+  describe('calculateGroupFlightPriceAlertThreshold', () => {
+    test('calculates group savings, discount percentage, and alert trigger status', () => {
+      const res = calculateGroupFlightPriceAlertThreshold(500, 400, 4);
+      expect(res.valid).toBe(true);
+      expect(res.currentTotal).toBe(2000);
+      expect(res.targetTotal).toBe(1600);
+      expect(res.potentialGroupSavings).toBe(400);
+      expect(res.discountPercentage).toBe(20);
+      expect(res.shouldAlertGroup).toBe(true);
+    });
+
+    test('returns invalid for zero prices', () => {
+      const res = calculateGroupFlightPriceAlertThreshold(0, 400);
+      expect(res.valid).toBe(false);
+      expect(res.shouldAlertGroup).toBe(false);
+    });
+  });
 });
+
 
 
 

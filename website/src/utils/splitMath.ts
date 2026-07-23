@@ -786,5 +786,49 @@ export function calculateMultiplayerSyncSessionState(
   };
 }
 
+export function calculateGroupFlightPriceAlertThreshold(
+  currentPricePerPerson: number,
+  targetPricePerPerson: number,
+  participantCount: number = 1
+): {
+  valid: boolean;
+  currentTotal: number;
+  targetTotal: number;
+  potentialGroupSavings: number;
+  discountPercentage: number;
+  shouldAlertGroup: boolean;
+} {
+  const current = typeof currentPricePerPerson === 'number' && currentPricePerPerson > 0 ? currentPricePerPerson : 0;
+  const target = typeof targetPricePerPerson === 'number' && targetPricePerPerson > 0 ? targetPricePerPerson : 0;
+  const count = typeof participantCount === 'number' && participantCount > 0 ? Math.floor(participantCount) : 1;
+
+  if (current === 0 || target === 0) {
+    return {
+      valid: false,
+      currentTotal: 0,
+      targetTotal: 0,
+      potentialGroupSavings: 0,
+      discountPercentage: 0,
+      shouldAlertGroup: false
+    };
+  }
+
+  const currentTotal = current * count;
+  const targetTotal = target * count;
+  const potentialGroupSavings = Math.max(0, Math.round((currentTotal - targetTotal) * 100) / 100);
+  const discountPercentage = current > target ? Math.round(((current - target) / current) * 100 * 10) / 10 : 0;
+  const shouldAlertGroup = current <= target || discountPercentage >= 10;
+
+  return {
+    valid: true,
+    currentTotal: Math.round(currentTotal * 100) / 100,
+    targetTotal: Math.round(targetTotal * 100) / 100,
+    potentialGroupSavings,
+    discountPercentage,
+    shouldAlertGroup
+  };
+}
+
+
 
 
