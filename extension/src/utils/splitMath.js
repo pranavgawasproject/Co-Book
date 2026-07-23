@@ -151,3 +151,435 @@ export function formatCurrency(amount, currency = 'INR', locale = null) {
     return `${symbol}${numericAmount.toFixed(2)}`;
   }
 }
+
+export function calculateMultiCurrencyConversion(
+  amount,
+  fromCurrency,
+  toCurrency,
+  exchangeRates = {}
+) {
+  if (isNaN(amount) || amount <= 0 || !fromCurrency || !toCurrency) return 0;
+  const from = fromCurrency.toUpperCase();
+  const to = toCurrency.toUpperCase();
+  if (from === to) return amount;
+
+  const defaultRates = {
+    USD: 1.0,
+    EUR: 0.92,
+    GBP: 0.78,
+    INR: 83.5,
+    JPY: 155.0,
+    CAD: 1.36,
+    AUD: 1.50
+  };
+
+  const rates = { ...defaultRates, ...exchangeRates };
+  const fromRate = rates[from];
+  const toRate = rates[to];
+
+  if (!fromRate || !toRate) return 0;
+  const amountInUSD = amount / fromRate;
+  const converted = amountInUSD * toRate;
+  return Math.round(converted * 100) / 100;
+}
+
+export function simplifyGroupBalances(netBalances) {
+  if (!Array.isArray(netBalances) || netBalances.length === 0) return [];
+
+  const debtors = [];
+  const creditors = [];
+
+  for (const item of netBalances) {
+    const rounded = Math.round(item.netAmount * 100) / 100;
+    if (rounded < 0) {
+      debtors.push({ member: item.member, amount: Math.abs(rounded) });
+    } else if (rounded > 0) {
+      creditors.push({ member: item.member, amount: rounded });
+    }
+  }
+
+  const transactions = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < debtors.length && j < creditors.length) {
+    const debtor = debtors[i];
+    const creditor = creditors[j];
+    const settlement = Math.min(debtor.amount, creditor.amount);
+
+    if (settlement > 0) {
+      transactions.push({
+        from: debtor.member,
+        to: creditor.member,
+        amount: Math.round(settlement * 100) / 100
+      });
+    }
+
+    debtor.amount -= settlement;
+    creditor.amount -= settlement;
+
+    if (Math.round(debtor.amount * 100) === 0) i++;
+    if (Math.round(creditor.amount * 100) === 0) j++;
+  }
+
+  return transactions;
+}
+
+export function validateGroupSplitInput(totalAmount, memberNames) {
+  const errors = [];
+  if (typeof totalAmount !== 'number' || isNaN(totalAmount) || totalAmount <= 0) {
+    errors.push('Total amount must be greater than zero');
+  }
+  if (!Array.isArray(memberNames) || memberNames.length < 2) {
+    errors.push('At least two group members are required to split');
+  } else {
+    const emptyNames = memberNames.filter(n => !n || !n.trim());
+    if (emptyNames.length > 0) {
+      errors.push('Member names cannot be empty');
+    }
+  }
+  return { isValid: errors.length === 0, errors };
+}
+
+export function calculateTipAndTaxDistributions(baseAmount, taxAmount, tipAmount, memberShares) {
+  if (baseAmount <= 0 || !Array.isArray(memberShares) || memberShares.length === 0) {
+    return { sharesWithTaxTip: (memberShares || []).map(() => 0), total: 0 };
+  }
+  const tax = Math.max(0, isNaN(taxAmount) ? 0 : taxAmount);
+  const tip = Math.max(0, isNaN(tipAmount) ? 0 : tipAmount);
+  const totalBill = baseAmount + tax + tip;
+  const ratio = totalBill / baseAmount;
+
+  const sharesWithTaxTip = memberShares.map(share => {
+    const s = Math.max(0, isNaN(share) ? 0 : share);
+    return Math.round(s * ratio * 100) / 100;
+  });
+
+  const total = Math.round(totalBill * 100) / 100;
+  return { sharesWithTaxTip, total };
+}
+
+export function generateCollaborativeSessionToken(tripId, userId) {
+  if (!tripId || !userId || typeof tripId !== 'string' || typeof userId !== 'string') {
+    return '';
+  }
+  const cleanTrip = tripId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanUser = userId.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!cleanTrip || !cleanUser) return '';
+  return `sync_${cleanTrip}_${cleanUser}`;
+}
+
+export function calculateCategorySpendingBreakdown(expenses) {
+  if (!Array.isArray(expenses)) return {};
+  const breakdown = {};
+
+  for (const exp of expenses) {
+    if (!exp) continue;
+    const cat = (exp.category && exp.category.trim()) || 'General';
+    const amt = typeof exp.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    breakdown[cat] = Math.round(((breakdown[cat] || 0) + amt) * 100) / 100;
+  }
+
+  return breakdown;
+}
+
+export function calculateBudgetPerPersonCap(totalBudget, memberCount, maxCapPerPerson) {
+  if (typeof totalBudget !== 'number' || isNaN(totalBudget) || totalBudget <= 0 ||
+      typeof memberCount !== 'number' || isNaN(memberCount) || memberCount <= 0) {
+    return { perPersonBudget: 0, exceedsCap: false, excessPerPerson: 0 };
+  }
+
+  const perPersonBudget = Math.round((totalBudget / memberCount) * 100) / 100;
+  if (typeof maxCapPerPerson !== 'number' || isNaN(maxCapPerPerson) || maxCapPerPerson <= 0) {
+    return { perPersonBudget, exceedsCap: false, excessPerPerson: 0 };
+  }
+
+  const exceedsCap = perPersonBudget > maxCapPerPerson;
+  const excessPerPerson = exceedsCap ? Math.round((perPersonBudget - maxCapPerPerson) * 100) / 100 : 0;
+
+  return { perPersonBudget, exceedsCap, excessPerPerson };
+}
+
+export function calculateGroupBudgetVelocity(expenses, totalBudget, elapsedDays, totalTripDays) {
+  if (
+    !Array.isArray(expenses) ||
+    typeof totalBudget !== 'number' ||
+    isNaN(totalBudget) ||
+    totalBudget <= 0 ||
+    typeof elapsedDays !== 'number' ||
+    isNaN(elapsedDays) ||
+    elapsedDays <= 0 ||
+    typeof totalTripDays !== 'number' ||
+    isNaN(totalTripDays) ||
+    totalTripDays <= 0
+  ) {
+    return {
+      dailyBurnRate: 0,
+      projectedTotalSpend: 0,
+      isOverBudget: false,
+      budgetUtilizationPercentage: 0
+    };
+  }
+
+  const totalSpent = expenses.reduce((sum, exp) => {
+    const amt = typeof exp?.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    return sum + amt;
+  }, 0);
+
+  const dailyBurnRate = Math.round((totalSpent / elapsedDays) * 100) / 100;
+  const projectedTotalSpend = Math.round(dailyBurnRate * totalTripDays * 100) / 100;
+  const isOverBudget = projectedTotalSpend > totalBudget;
+  const budgetUtilizationPercentage = Math.round((totalSpent / totalBudget) * 100 * 10) / 10;
+
+  return {
+    dailyBurnRate,
+    projectedTotalSpend,
+    isOverBudget,
+    budgetUtilizationPercentage
+  };
+}
+
+export function calculateGroupSettleUpPlan(balances) {
+  if (!balances || typeof balances !== 'object') {
+    return { transactions: [], totalVolume: 0, isSettled: true };
+  }
+
+  const netBalances = Object.entries(balances).map(([member, netAmount]) => ({
+    member,
+    netAmount: typeof netAmount === 'number' && !isNaN(netAmount) ? netAmount : 0
+  }));
+
+  const transactions = simplifyGroupBalances(netBalances);
+  const totalVolume = Math.round(
+    transactions.reduce((sum, tx) => sum + tx.amount, 0) * 100
+  ) / 100;
+
+  return {
+    transactions,
+    totalVolume,
+    isSettled: transactions.length === 0
+  };
+}
+
+export function calculateGroupExpenseFairnessIndex(balances) {
+  const entries = Object.entries(balances || {});
+  if (entries.length === 0) {
+    return { fairnessScore: 100, rating: 'Highly Balanced', topPayer: '', topOwer: '' };
+  }
+
+  let maxNet = -Infinity;
+  let minNet = Infinity;
+  let topPayer = '';
+  let topOwer = '';
+  let totalAbsNet = 0;
+
+  for (const [member, net] of entries) {
+    const val = typeof net === 'number' && !isNaN(net) ? net : 0;
+    totalAbsNet += Math.abs(val);
+    if (val > maxNet) {
+      maxNet = val;
+      topPayer = member;
+    }
+    if (val < minNet) {
+      minNet = val;
+      topOwer = member;
+    }
+  }
+
+  const avgImbalancePerPerson = totalAbsNet / entries.length;
+  const rawScore = Math.max(0, 100 - Math.round(avgImbalancePerPerson * 0.5));
+  const fairnessScore = Math.min(100, rawScore);
+
+  let rating = 'Highly Balanced';
+  if (fairnessScore < 60) {
+    rating = 'Highly Unbalanced';
+  } else if (fairnessScore < 85) {
+    rating = 'Slightly Disproportionate';
+  }
+
+  return {
+    fairnessScore,
+    rating,
+    topPayer: maxNet > 0 ? topPayer : '',
+    topOwer: minNet < 0 ? topOwer : ''
+  };
+}
+
+export function calculateGroupDepositEscrowShares(expenses, depositTotal, memberCount) {
+  if (
+    typeof depositTotal !== 'number' ||
+    isNaN(depositTotal) ||
+    depositTotal <= 0 ||
+    typeof memberCount !== 'number' ||
+    isNaN(memberCount) ||
+    memberCount <= 0
+  ) {
+    return { perPersonDeposit: 0, totalDeposit: 0, remainingRefundablePerPerson: 0, deductedDamagePerPerson: 0 };
+  }
+
+  const perPersonDeposit = Math.round((depositTotal / memberCount) * 100) / 100;
+  const totalDamages = (Array.isArray(expenses) ? expenses : []).reduce((sum, exp) => {
+    const amt = typeof exp?.amount === 'number' && !isNaN(exp.amount) && exp.amount > 0 ? exp.amount : 0;
+    return sum + amt;
+  }, 0);
+
+  const damagePerPerson = Math.min(perPersonDeposit, Math.round((totalDamages / memberCount) * 100) / 100);
+  const remainingRefundablePerPerson = Math.max(0, Math.round((perPersonDeposit - damagePerPerson) * 100) / 100);
+
+  return {
+    perPersonDeposit,
+    totalDeposit: Math.round(depositTotal * 100) / 100,
+    remainingRefundablePerPerson,
+    deductedDamagePerPerson: damagePerPerson
+  };
+}
+
+export function calculateGroupFlightSeatUpgradeShare(baseFlightTotal, upgradeFeeTotal, totalMembers, upgradedMemberCount) {
+  if (
+    typeof baseFlightTotal !== 'number' || isNaN(baseFlightTotal) || baseFlightTotal <= 0 ||
+    typeof totalMembers !== 'number' || isNaN(totalMembers) || totalMembers <= 0
+  ) {
+    return { basePerPerson: 0, upgradedPerPerson: 0, totalFlightCost: 0 };
+  }
+
+  const basePerPerson = Math.round((baseFlightTotal / totalMembers) * 100) / 100;
+  const upgradeFee = typeof upgradeFeeTotal === 'number' && !isNaN(upgradeFeeTotal) && upgradeFeeTotal > 0 ? upgradeFeeTotal : 0;
+  const optInCount = typeof upgradedMemberCount === 'number' && upgradedMemberCount > 0 ? Math.min(upgradedMemberCount, totalMembers) : 0;
+
+  const upgradePerOptIn = optInCount > 0 ? Math.round((upgradeFee / optInCount) * 100) / 100 : 0;
+  const upgradedPerPerson = Math.round((basePerPerson + upgradePerOptIn) * 100) / 100;
+
+  return {
+    basePerPerson,
+    upgradedPerPerson,
+    totalFlightCost: Math.round((baseFlightTotal + upgradeFee) * 100) / 100
+  };
+}
+
+export function calculateTripCurrencyConversionRate(amount, exchangeRate, platformFeePercentage = 0) {
+  if (
+    typeof amount !== 'number' || isNaN(amount) || amount <= 0 ||
+    typeof exchangeRate !== 'number' || isNaN(exchangeRate) || exchangeRate <= 0
+  ) {
+    return { convertedAmount: 0, platformFeeAmount: 0, finalTotal: 0 };
+  }
+
+  const convertedAmount = Math.round(amount * exchangeRate * 100) / 100;
+  const feeRate = typeof platformFeePercentage === 'number' && platformFeePercentage > 0 ? platformFeePercentage / 100 : 0;
+  const platformFeeAmount = Math.round(convertedAmount * feeRate * 100) / 100;
+  const finalTotal = Math.round((convertedAmount + platformFeeAmount) * 100) / 100;
+
+  return {
+    convertedAmount,
+    platformFeeAmount,
+    finalTotal
+  };
+}
+
+export function calculateGroupCustomRatioSplit(totalAmount, ratios) {
+  if (totalAmount <= 0 || !Array.isArray(ratios) || ratios.length === 0) {
+    return { shares: (ratios || []).map(() => 0), remainderCents: 0 };
+  }
+
+  const validRatios = ratios.map(r => (isNaN(r) || !isFinite(r) ? 0 : Math.max(0, r)));
+  const totalRatio = validRatios.reduce((sum, r) => sum + r, 0);
+
+  if (totalRatio <= 0) {
+    return { shares: ratios.map(() => 0), remainderCents: 0 };
+  }
+
+  const totalCents = Math.round(totalAmount * 100);
+  let allocatedCents = 0;
+  const sharesInCents = validRatios.map(r => {
+    const cents = Math.floor((totalCents * r) / totalRatio);
+    allocatedCents += cents;
+    return cents;
+  });
+
+  let remainderCents = totalCents - allocatedCents;
+  for (let i = 0; i < sharesInCents.length && remainderCents > 0; i++) {
+    if (validRatios[i] > 0) {
+      sharesInCents[i] += 1;
+      remainderCents -= 1;
+    }
+  }
+
+  return {
+    shares: sharesInCents.map(c => c / 100),
+    remainderCents: remainderCents / 100
+  };
+}
+
+export function calculateCoBookingDiscountShare(totalOrderAmount, discountPercentage, participantCount) {
+  if (
+    typeof totalOrderAmount !== 'number' || isNaN(totalOrderAmount) || totalOrderAmount <= 0 ||
+    typeof participantCount !== 'number' || isNaN(participantCount) || participantCount <= 0
+  ) {
+    return {
+      valid: false,
+      totalOrderAmount: 0,
+      totalDiscountAmount: 0,
+      netOrderAmount: 0,
+      perPersonOriginalShare: 0,
+      perPersonDiscountShare: 0,
+      perPersonNetPayable: 0
+    };
+  }
+
+  const pct = typeof discountPercentage === 'number' && !isNaN(discountPercentage) ? Math.max(0, Math.min(100, discountPercentage)) : 0;
+  const count = Math.max(1, Math.floor(participantCount));
+
+  const totalDiscountAmount = Math.round((totalOrderAmount * (pct / 100)) * 100) / 100;
+  const netOrderAmount = Math.round((totalOrderAmount - totalDiscountAmount) * 100) / 100;
+
+  const perPersonOriginalShare = Math.round((totalOrderAmount / count) * 100) / 100;
+  const perPersonDiscountShare = Math.round((totalDiscountAmount / count) * 100) / 100;
+  const perPersonNetPayable = Math.round((netOrderAmount / count) * 100) / 100;
+
+  return {
+    valid: true,
+    totalOrderAmount,
+    totalDiscountAmount,
+    netOrderAmount,
+    perPersonOriginalShare,
+    perPersonDiscountShare,
+    perPersonNetPayable
+  };
+}
+
+export function calculateGroupFlightVsHotelSplitRatio(flightTotal, hotelTotal, participantCount) {
+  const flight = typeof flightTotal === 'number' && !isNaN(flightTotal) && flightTotal >= 0 ? flightTotal : 0;
+  const hotel = typeof hotelTotal === 'number' && !isNaN(hotelTotal) && hotelTotal >= 0 ? hotelTotal : 0;
+  const count = typeof participantCount === 'number' && !isNaN(participantCount) && participantCount > 0 ? Math.floor(participantCount) : 0;
+
+  if (count === 0 || (flight === 0 && hotel === 0)) {
+    return {
+      valid: false,
+      totalBookingCost: 0,
+      flightPercentage: 0,
+      hotelPercentage: 0,
+      perPersonFlightShare: 0,
+      perPersonHotelShare: 0,
+      perPersonTotalShare: 0
+    };
+  }
+
+  const totalBookingCost = Math.round((flight + hotel) * 100) / 100;
+  const flightPercentage = Math.round((flight / totalBookingCost) * 100 * 100) / 100;
+  const hotelPercentage = Math.round((hotel / totalBookingCost) * 100 * 100) / 100;
+
+  const perPersonFlightShare = Math.round((flight / count) * 100) / 100;
+  const perPersonHotelShare = Math.round((hotel / count) * 100) / 100;
+  const perPersonTotalShare = Math.round((totalBookingCost / count) * 100) / 100;
+
+  return {
+    valid: true,
+    totalBookingCost,
+    flightPercentage,
+    hotelPercentage,
+    perPersonFlightShare,
+    perPersonHotelShare,
+    perPersonTotalShare
+  };
+}
+

@@ -55,9 +55,18 @@ export async function extractPropertyData(selectors) {
   return extractedData;
 }
 
-export function getDomainForCurrentPage() {
-  const url = window.location.href;
-  if (url.includes('airbnb.')) return 'airbnb';
-  if (url.includes('makemytrip.com')) return 'makemytrip';
+export function getDomainForCurrentPage(targetUrl = null) {
+  const url = targetUrl || (typeof window !== 'undefined' ? window.location?.href : '');
+  if (!url || typeof url !== 'string') return null;
+  const lowerUrl = url.toLowerCase();
+
+  if (lowerUrl.includes('airbnb.')) return 'airbnb';
+  if (lowerUrl.includes('makemytrip.com') || lowerUrl.includes('makemytrip.')) return 'makemytrip';
+  if (lowerUrl.includes('booking.com')) return 'booking';
+  if (lowerUrl.includes('expedia.')) return 'expedia';
+  if (lowerUrl.includes('agoda.com')) return 'agoda';
+  if (lowerUrl.includes('vrbo.com')) return 'vrbo';
+  if (lowerUrl.includes('trip.com')) return 'trip';
   return null;
 }
+

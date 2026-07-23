@@ -178,6 +178,7 @@ function getUserColor(userId) {
     '#f97316', // orange
     '#06b6d4', // cyan
   ];
+  if (!userId || typeof userId !== 'string') return colors[0];
   let hash = 0;
   for (let i = 0; i < userId.length; i++) {
     hash = userId.charCodeAt(i) + ((hash << 5) - hash);
