@@ -653,3 +653,52 @@ export function calculateCoBookingDiscountShare(
     perPersonNetPayable
   };
 }
+
+export function calculateGroupFlightVsHotelSplitRatio(
+  flightTotal: number,
+  hotelTotal: number,
+  participantCount: number
+): {
+  valid: boolean;
+  totalBookingCost: number;
+  flightPercentage: number;
+  hotelPercentage: number;
+  perPersonFlightShare: number;
+  perPersonHotelShare: number;
+  perPersonTotalShare: number;
+} {
+  const flight = typeof flightTotal === 'number' && !isNaN(flightTotal) && flightTotal >= 0 ? flightTotal : 0;
+  const hotel = typeof hotelTotal === 'number' && !isNaN(hotelTotal) && hotelTotal >= 0 ? hotelTotal : 0;
+  const count = typeof participantCount === 'number' && !isNaN(participantCount) && participantCount > 0 ? Math.floor(participantCount) : 0;
+
+  if (count === 0 || (flight === 0 && hotel === 0)) {
+    return {
+      valid: false,
+      totalBookingCost: 0,
+      flightPercentage: 0,
+      hotelPercentage: 0,
+      perPersonFlightShare: 0,
+      perPersonHotelShare: 0,
+      perPersonTotalShare: 0
+    };
+  }
+
+  const totalBookingCost = Math.round((flight + hotel) * 100) / 100;
+  const flightPercentage = Math.round((flight / totalBookingCost) * 100 * 100) / 100;
+  const hotelPercentage = Math.round((hotel / totalBookingCost) * 100 * 100) / 100;
+
+  const perPersonFlightShare = Math.round((flight / count) * 100) / 100;
+  const perPersonHotelShare = Math.round((hotel / count) * 100) / 100;
+  const perPersonTotalShare = Math.round((totalBookingCost / count) * 100) / 100;
+
+  return {
+    valid: true,
+    totalBookingCost,
+    flightPercentage,
+    hotelPercentage,
+    perPersonFlightShare,
+    perPersonHotelShare,
+    perPersonTotalShare
+  };
+}
+

@@ -19,7 +19,8 @@ import {
   calculateGroupFlightSeatUpgradeShare,
   calculateTripCurrencyConversionRate,
   calculateGroupCustomRatioSplit,
-  calculateCoBookingDiscountShare
+  calculateCoBookingDiscountShare,
+  calculateGroupFlightVsHotelSplitRatio
 } from '../splitMath';
 
 
@@ -351,7 +352,27 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.netOrderAmount).toBe(0);
     });
   });
+
+  describe('calculateGroupFlightVsHotelSplitRatio', () => {
+    test('calculates flight vs hotel percentages and per person breakdown', () => {
+      const res = calculateGroupFlightVsHotelSplitRatio(600, 400, 4);
+      expect(res.valid).toBe(true);
+      expect(res.totalBookingCost).toBe(1000);
+      expect(res.flightPercentage).toBe(60);
+      expect(res.hotelPercentage).toBe(40);
+      expect(res.perPersonFlightShare).toBe(150);
+      expect(res.perPersonHotelShare).toBe(100);
+      expect(res.perPersonTotalShare).toBe(250);
+    });
+
+    test('handles zero totals or participants gracefully', () => {
+      const res = calculateGroupFlightVsHotelSplitRatio(0, 0, 0);
+      expect(res.valid).toBe(false);
+      expect(res.totalBookingCost).toBe(0);
+    });
+  });
 });
+
 
 
 
