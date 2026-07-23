@@ -21,7 +21,8 @@ import {
   calculateGroupCustomRatioSplit,
   calculateCoBookingDiscountShare,
   calculateGroupFlightVsHotelSplitRatio,
-  calculateGroupTravelCurrencyConversionSplit
+  calculateGroupTravelCurrencyConversionSplit,
+  calculateMultiplayerSyncSessionState
 } from '../splitMath';
 
 
@@ -387,6 +388,40 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTravelCurrencyConversionSplit(0, 1.2);
       expect(res.valid).toBe(false);
       expect(res.netPayableHomeCurrency).toBe(0);
+    });
+  });
+
+  describe('calculateMultiplayerSyncSessionState', () => {
+    test('calculates active participants, consensus ratio and booking readiness', () => {
+      const participants = [
+        { id: '1', name: 'Alex', isApproved: true, isActive: true },
+        { id: '2', name: 'Sam', isApproved: true, isActive: true },
+        { id: '3', name: 'Jordan', isApproved: false, isActive: true }
+      ];
+      const res = calculateMultiplayerSyncSessionState(participants, 300);
+      expect(res.valid).toBe(true);
+      expect(res.totalParticipants).toBe(3);
+      expect(res.activeCount).toBe(3);
+      expect(res.approvedCount).toBe(2);
+      expect(res.consensusPercentage).toBe(67);
+      expect(res.isReadyToBook).toBe(false);
+      expect(res.perParticipantShare).toBe(100);
+    });
+
+    test('returns ready to book when all participants approve', () => {
+      const participants = [
+        { id: '1', name: 'Alex', isApproved: true },
+        { id: '2', name: 'Sam', isApproved: true }
+      ];
+      const res = calculateMultiplayerSyncSessionState(participants, 200);
+      expect(res.isReadyToBook).toBe(true);
+      expect(res.consensusPercentage).toBe(100);
+    });
+
+    test('handles empty participants array gracefully', () => {
+      const res = calculateMultiplayerSyncSessionState([], 100);
+      expect(res.valid).toBe(false);
+      expect(res.isReadyToBook).toBe(false);
     });
   });
 });

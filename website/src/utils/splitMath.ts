@@ -743,4 +743,48 @@ export function calculateGroupTravelCurrencyConversionSplit(
   };
 }
 
+export function calculateMultiplayerSyncSessionState(
+  participants: Array<{ id: string; name: string; isApproved?: boolean; isActive?: boolean }>,
+  totalBookingAmount: number
+): {
+  valid: boolean;
+  totalParticipants: number;
+  activeCount: number;
+  approvedCount: number;
+  consensusPercentage: number;
+  isReadyToBook: boolean;
+  perParticipantShare: number;
+} {
+  if (!Array.isArray(participants) || participants.length === 0) {
+    return {
+      valid: false,
+      totalParticipants: 0,
+      activeCount: 0,
+      approvedCount: 0,
+      consensusPercentage: 0,
+      isReadyToBook: false,
+      perParticipantShare: 0
+    };
+  }
+
+  const amount = typeof totalBookingAmount === 'number' && !isNaN(totalBookingAmount) && totalBookingAmount > 0 ? totalBookingAmount : 0;
+  const total = participants.length;
+  const activeCount = participants.filter(p => p && p.isActive !== false).length;
+  const approvedCount = participants.filter(p => p && p.isApproved === true).length;
+  const consensusPercentage = Math.round((approvedCount / total) * 100);
+  const isReadyToBook = approvedCount === total && total > 0;
+  const perParticipantShare = amount > 0 ? Math.round((amount / total) * 100) / 100 : 0;
+
+  return {
+    valid: true,
+    totalParticipants: total,
+    activeCount,
+    approvedCount,
+    consensusPercentage,
+    isReadyToBook,
+    perParticipantShare
+  };
+}
+
+
 
