@@ -829,6 +829,46 @@ export function calculateGroupFlightPriceAlertThreshold(
   };
 }
 
+export function calculateGroupItineraryTimeSlotConflictScore(
+  events: Array<{ title?: string; startHour?: number; endHour?: number }>
+): {
+  valid: boolean;
+  totalEvents: number;
+  conflictCount: number;
+  hasScheduleConflicts: boolean;
+  conflicts: Array<{ event1: string; event2: string }>;
+} {
+  if (!Array.isArray(events) || events.length === 0) {
+    return { valid: false, totalEvents: 0, conflictCount: 0, hasScheduleConflicts: false, conflicts: [] };
+  }
+
+  const validEvents = events.filter(e => e && typeof e.startHour === 'number' && typeof e.endHour === 'number' && e.endHour > e.startHour);
+  const conflicts: Array<{ event1: string; event2: string }> = [];
+
+  for (let i = 0; i < validEvents.length; i++) {
+    for (let j = i + 1; j < validEvents.length; j++) {
+      const e1 = validEvents[i];
+      const e2 = validEvents[j];
+
+      if (e1.startHour! < e2.endHour! && e2.startHour! < e1.endHour!) {
+        conflicts.push({
+          event1: e1.title || `Event ${i + 1}`,
+          event2: e2.title || `Event ${j + 1}`
+        });
+      }
+    }
+  }
+
+  return {
+    valid: true,
+    totalEvents: validEvents.length,
+    conflictCount: conflicts.length,
+    hasScheduleConflicts: conflicts.length > 0,
+    conflicts
+  };
+}
+
+
 
 
 

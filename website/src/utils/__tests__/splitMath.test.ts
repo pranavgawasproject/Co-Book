@@ -23,7 +23,8 @@ import {
   calculateGroupFlightVsHotelSplitRatio,
   calculateGroupTravelCurrencyConversionSplit,
   calculateMultiplayerSyncSessionState,
-  calculateGroupFlightPriceAlertThreshold
+  calculateGroupFlightPriceAlertThreshold,
+  calculateGroupItineraryTimeSlotConflictScore
 } from '../splitMath';
 
 
@@ -442,6 +443,28 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupFlightPriceAlertThreshold(0, 400);
       expect(res.valid).toBe(false);
       expect(res.shouldAlertGroup).toBe(false);
+    });
+  });
+
+  describe('calculateGroupItineraryTimeSlotConflictScore', () => {
+    test('detects overlapping time slots and reports conflicts', () => {
+      const events = [
+        { title: 'Flight Arrival', startHour: 10, endHour: 12 },
+        { title: 'Hotel Check-in', startHour: 11, endHour: 13 },
+        { title: 'Dinner', startHour: 18, endHour: 20 }
+      ];
+      const res = calculateGroupItineraryTimeSlotConflictScore(events);
+      expect(res.valid).toBe(true);
+      expect(res.totalEvents).toBe(3);
+      expect(res.conflictCount).toBe(1);
+      expect(res.hasScheduleConflicts).toBe(true);
+      expect(res.conflicts[0]).toEqual({ event1: 'Flight Arrival', event2: 'Hotel Check-in' });
+    });
+
+    test('handles empty events array gracefully', () => {
+      const res = calculateGroupItineraryTimeSlotConflictScore([]);
+      expect(res.valid).toBe(false);
+      expect(res.hasScheduleConflicts).toBe(false);
     });
   });
 });
