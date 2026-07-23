@@ -868,6 +868,65 @@ export function calculateGroupItineraryTimeSlotConflictScore(
   };
 }
 
+export function calculateGroupExpenseEquitabilityIndex(
+  memberPayments: Array<{ memberName: string; amountPaid: number }>
+): {
+  valid: boolean;
+  totalGroupExpense: number;
+  perMemberAverage: number;
+  memberCount: number;
+  isEquitable: boolean;
+  netBalances: Record<string, number>;
+} {
+  if (!Array.isArray(memberPayments) || memberPayments.length === 0) {
+    return {
+      valid: false,
+      totalGroupExpense: 0,
+      perMemberAverage: 0,
+      memberCount: 0,
+      isEquitable: true,
+      netBalances: {}
+    };
+  }
+
+  const validPayments = memberPayments.filter(m => m && typeof m.memberName === 'string' && typeof m.amountPaid === 'number' && m.amountPaid >= 0);
+  if (validPayments.length === 0) {
+    return {
+      valid: false,
+      totalGroupExpense: 0,
+      perMemberAverage: 0,
+      memberCount: 0,
+      isEquitable: true,
+      netBalances: {}
+    };
+  }
+
+  const totalGroupExpense = validPayments.reduce((sum, m) => sum + m.amountPaid, 0);
+  const memberCount = validPayments.length;
+  const perMemberAverage = Math.round((totalGroupExpense / memberCount) * 100) / 100;
+
+  const netBalances: Record<string, number> = {};
+  let maxVariance = 0;
+
+  for (const m of validPayments) {
+    const net = Math.round((m.amountPaid - perMemberAverage) * 100) / 100;
+    netBalances[m.memberName] = net;
+    maxVariance = Math.max(maxVariance, Math.abs(net));
+  }
+
+  const isEquitable = maxVariance < 0.05 * perMemberAverage;
+
+  return {
+    valid: true,
+    totalGroupExpense: Math.round(totalGroupExpense * 100) / 100,
+    perMemberAverage,
+    memberCount,
+    isEquitable,
+    netBalances
+  };
+}
+
+
 
 
 

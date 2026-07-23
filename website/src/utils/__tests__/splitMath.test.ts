@@ -24,7 +24,8 @@ import {
   calculateGroupTravelCurrencyConversionSplit,
   calculateMultiplayerSyncSessionState,
   calculateGroupFlightPriceAlertThreshold,
-  calculateGroupItineraryTimeSlotConflictScore
+  calculateGroupItineraryTimeSlotConflictScore,
+  calculateGroupExpenseEquitabilityIndex
 } from '../splitMath';
 
 
@@ -467,7 +468,32 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.hasScheduleConflicts).toBe(false);
     });
   });
+
+  describe('calculateGroupExpenseEquitabilityIndex', () => {
+    test('calculates group expense equitability and net balances', () => {
+      const memberPayments = [
+        { memberName: 'Alice', amountPaid: 300 },
+        { memberName: 'Bob', amountPaid: 100 },
+        { memberName: 'Charlie', amountPaid: 200 }
+      ];
+      const res = calculateGroupExpenseEquitabilityIndex(memberPayments);
+      expect(res.valid).toBe(true);
+      expect(res.totalGroupExpense).toBe(600);
+      expect(res.perMemberAverage).toBe(200);
+      expect(res.memberCount).toBe(3);
+      expect(res.netBalances.Alice).toBe(100);
+      expect(res.netBalances.Bob).toBe(-100);
+      expect(res.netBalances.Charlie).toBe(0);
+    });
+
+    test('handles empty member payments gracefully', () => {
+      const res = calculateGroupExpenseEquitabilityIndex([]);
+      expect(res.valid).toBe(false);
+      expect(res.isEquitable).toBe(true);
+    });
+  });
 });
+
 
 
 
