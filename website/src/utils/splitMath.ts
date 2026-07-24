@@ -1178,6 +1178,64 @@ export function calculateGroupSettlementFairnessIndex(
   };
 }
 
+export function calculateGroupTripCurrencyReserve(
+  estimatedTotalCostHomeCurrency: number = 2000,
+  volatilityPercentage: number = 5.0,
+  bufferPercentage: number = 10.0,
+  memberCount: number = 4
+): {
+  valid: boolean;
+  estimatedTotalCostHomeCurrency: number;
+  currencyVolatilityReserveUsd: number;
+  contingencyBufferUsd: number;
+  recommendedTotalGroupReserveUsd: number;
+  perMemberTargetContributionUsd: number;
+  safetyTier: 'CONSERVATIVE' | 'BALANCED' | 'MINIMAL';
+  recommendation: string;
+} {
+  const cost = typeof estimatedTotalCostHomeCurrency === 'number' && !isNaN(estimatedTotalCostHomeCurrency) && estimatedTotalCostHomeCurrency > 0 ? estimatedTotalCostHomeCurrency : 0;
+  const members = typeof memberCount === 'number' && !isNaN(memberCount) && memberCount > 0 ? Math.floor(memberCount) : 0;
+
+  if (cost === 0 || members === 0) {
+    return {
+      valid: false,
+      estimatedTotalCostHomeCurrency: 0,
+      currencyVolatilityReserveUsd: 0,
+      contingencyBufferUsd: 0,
+      recommendedTotalGroupReserveUsd: 0,
+      perMemberTargetContributionUsd: 0,
+      safetyTier: 'MINIMAL',
+      recommendation: 'Valid total cost and member count required.'
+    };
+  }
+
+  const volPct = typeof volatilityPercentage === 'number' && !isNaN(volatilityPercentage) && volatilityPercentage >= 0 ? volatilityPercentage / 100 : 0.05;
+  const bufPct = typeof bufferPercentage === 'number' && !isNaN(bufferPercentage) && bufferPercentage >= 0 ? bufferPercentage / 100 : 0.10;
+
+  const currencyVolatilityReserveUsd = Math.round(cost * volPct * 100) / 100;
+  const contingencyBufferUsd = Math.round(cost * bufPct * 100) / 100;
+  const totalReserve = currencyVolatilityReserveUsd + contingencyBufferUsd;
+  const recommendedTotalGroupReserveUsd = Math.round((cost + totalReserve) * 100) / 100;
+  const perMemberTargetContributionUsd = Math.round((recommendedTotalGroupReserveUsd / members) * 100) / 100;
+
+  const totalBufferRate = volPct + bufPct;
+  let safetyTier: 'CONSERVATIVE' | 'BALANCED' | 'MINIMAL' = 'BALANCED';
+  if (totalBufferRate >= 0.15) safetyTier = 'CONSERVATIVE';
+  else if (totalBufferRate < 0.08) safetyTier = 'MINIMAL';
+
+  return {
+    valid: true,
+    estimatedTotalCostHomeCurrency: cost,
+    currencyVolatilityReserveUsd,
+    contingencyBufferUsd,
+    recommendedTotalGroupReserveUsd,
+    perMemberTargetContributionUsd,
+    safetyTier,
+    recommendation: `Recommended total budget of $${recommendedTotalGroupReserveUsd.toFixed(2)} ($${perMemberTargetContributionUsd.toFixed(2)}/person) includes $${totalReserve.toFixed(2)} for currency volatility & contingency reserve.`
+  };
+}
+
+
 
 
 

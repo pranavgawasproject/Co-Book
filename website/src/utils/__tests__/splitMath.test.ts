@@ -30,7 +30,8 @@ import {
   calculateGroupTravelActivityBudgetAllocation,
   calculateGroupSharedLodgingCostOptimization,
   calculateGroupTripBudgetVarianceScore,
-  calculateGroupSettlementFairnessIndex
+  calculateGroupSettlementFairnessIndex,
+  calculateGroupTripCurrencyReserve
 } from '../splitMath';
 
 
@@ -592,6 +593,25 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupSettlementFairnessIndex({});
       expect(res.valid).toBe(false);
       expect(res.recommendation).toBe('Net balances map cannot be empty.');
+    });
+  });
+
+  describe('calculateGroupTripCurrencyReserve', () => {
+    test('calculates currency volatility reserve and target contribution correctly', () => {
+      const res = calculateGroupTripCurrencyReserve(2000, 5, 10, 4);
+      expect(res.valid).toBe(true);
+      expect(res.estimatedTotalCostHomeCurrency).toBe(2000);
+      expect(res.currencyVolatilityReserveUsd).toBe(100);
+      expect(res.contingencyBufferUsd).toBe(200);
+      expect(res.recommendedTotalGroupReserveUsd).toBe(2300);
+      expect(res.perMemberTargetContributionUsd).toBe(575);
+      expect(res.safetyTier).toBe('CONSERVATIVE');
+    });
+
+    test('returns invalid for zero total cost or zero member count', () => {
+      const res = calculateGroupTripCurrencyReserve(0, 5, 10, 0);
+      expect(res.valid).toBe(false);
+      expect(res.recommendedTotalGroupReserveUsd).toBe(0);
     });
   });
 });
