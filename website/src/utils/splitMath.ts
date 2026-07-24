@@ -1114,5 +1114,70 @@ export function calculateGroupTripBudgetVarianceScore(
   };
 }
 
+export function calculateGroupSettlementFairnessIndex(
+  netBalances: Record<string, number> = {}
+): {
+  valid: boolean;
+  participantCount: number;
+  totalImbalanceUsd: number;
+  maxDebtor: string;
+  maxCreditor: string;
+  fairnessIndex: number;
+  isFair: boolean;
+  recommendation: string;
+} {
+  const entries = Object.entries(netBalances);
+  if (entries.length === 0) {
+    return {
+      valid: false,
+      participantCount: 0,
+      totalImbalanceUsd: 0,
+      maxDebtor: '',
+      maxCreditor: '',
+      fairnessIndex: 100,
+      isFair: true,
+      recommendation: 'Net balances map cannot be empty.'
+    };
+  }
+
+  let totalImbalanceUsd = 0;
+  let minBal = 0;
+  let maxBal = 0;
+  let maxDebtor = '';
+  let maxCreditor = '';
+
+  for (const [person, bal] of entries) {
+    const val = typeof bal === 'number' && !isNaN(bal) ? bal : 0;
+    totalImbalanceUsd += Math.abs(val);
+    if (val < minBal) {
+      minBal = val;
+      maxDebtor = person;
+    }
+    if (val > maxBal) {
+      maxBal = val;
+      maxCreditor = person;
+    }
+  }
+
+  totalImbalanceUsd = Math.round(totalImbalanceUsd * 100) / 100;
+  const avgImbalance = totalImbalanceUsd / entries.length;
+  const fairnessIndex = Math.max(0, Math.min(100, Math.round(100 - (avgImbalance * 0.25))));
+  const isFair = fairnessIndex >= 70;
+
+  return {
+    valid: true,
+    participantCount: entries.length,
+    totalImbalanceUsd,
+    maxDebtor,
+    maxCreditor,
+    fairnessIndex,
+    isFair,
+    recommendation: isFair
+      ? 'Group expense distribution is balanced and fair.'
+      : `High imbalance detected ($${totalImbalanceUsd.toFixed(2)} total imbalance). Recommend settling debts.`
+  };
+}
+
+
 
 

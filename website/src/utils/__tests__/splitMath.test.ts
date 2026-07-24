@@ -29,7 +29,8 @@ import {
   calculateGroupExpenseSettlementOptimizations,
   calculateGroupTravelActivityBudgetAllocation,
   calculateGroupSharedLodgingCostOptimization,
-  calculateGroupTripBudgetVarianceScore
+  calculateGroupTripBudgetVarianceScore,
+  calculateGroupSettlementFairnessIndex
 } from '../splitMath';
 
 
@@ -572,6 +573,25 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTripBudgetVarianceScore(0, 500);
       expect(res.valid).toBe(false);
       expect(res.isOverBudget).toBe(false);
+    });
+  });
+
+  describe('calculateGroupSettlementFairnessIndex', () => {
+    test('calculates fairness index and max debtor/creditor', () => {
+      const netBalances = { Alice: 100, Bob: -60, Charlie: -40 };
+      const res = calculateGroupSettlementFairnessIndex(netBalances);
+      expect(res.valid).toBe(true);
+      expect(res.participantCount).toBe(3);
+      expect(res.totalImbalanceUsd).toBe(200);
+      expect(res.maxDebtor).toBe('Bob');
+      expect(res.maxCreditor).toBe('Alice');
+      expect(res.isFair).toBe(true);
+    });
+
+    test('returns invalid for empty net balances map', () => {
+      const res = calculateGroupSettlementFairnessIndex({});
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toBe('Net balances map cannot be empty.');
     });
   });
 });
