@@ -1026,3 +1026,42 @@ export function calculateGroupTravelActivityBudgetAllocation(
   };
 }
 
+export function calculateGroupSharedLodgingCostOptimization(
+  nightlyVillaRateUsd: number = 300,
+  stayDurationNights: number = 5,
+  groupMemberCount: number = 6
+): {
+  valid: boolean;
+  totalLodgingCostUsd: number;
+  perPersonLodgingCostUsd: number;
+  perPersonNightlyRateUsd: number;
+  recommendation: string;
+} {
+  const rate = typeof nightlyVillaRateUsd === 'number' && nightlyVillaRateUsd > 0 ? nightlyVillaRateUsd : 0;
+  const nights = typeof stayDurationNights === 'number' && stayDurationNights > 0 ? stayDurationNights : 0;
+  const members = typeof groupMemberCount === 'number' && groupMemberCount > 0 ? groupMemberCount : 0;
+
+  if (rate === 0 || nights === 0 || members === 0) {
+    return {
+      valid: false,
+      totalLodgingCostUsd: 0,
+      perPersonLodgingCostUsd: 0,
+      perPersonNightlyRateUsd: 0,
+      recommendation: 'Valid nightly rate, stay duration, and member count are required.'
+    };
+  }
+
+  const totalLodgingCostUsd = Math.round(rate * nights * 100) / 100;
+  const perPersonLodgingCostUsd = Math.round((totalLodgingCostUsd / members) * 100) / 100;
+  const perPersonNightlyRateUsd = Math.round((perPersonLodgingCostUsd / nights) * 100) / 100;
+
+  return {
+    valid: true,
+    totalLodgingCostUsd,
+    perPersonLodgingCostUsd,
+    perPersonNightlyRateUsd,
+    recommendation: `Group of ${members} sharing villa for ${nights} nights pays $${perPersonNightlyRateUsd.toFixed(2)}/night per person (Total $${perPersonLodgingCostUsd.toFixed(2)} per person).`
+  };
+}
+
+

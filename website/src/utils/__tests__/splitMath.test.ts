@@ -27,8 +27,10 @@ import {
   calculateGroupItineraryTimeSlotConflictScore,
   calculateGroupExpenseEquitabilityIndex,
   calculateGroupExpenseSettlementOptimizations,
-  calculateGroupTravelActivityBudgetAllocation
+  calculateGroupTravelActivityBudgetAllocation,
+  calculateGroupSharedLodgingCostOptimization
 } from '../splitMath';
+
 
 
 
@@ -534,7 +536,25 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.perPersonBudget).toBe(0);
     });
   });
+
+  describe('calculateGroupSharedLodgingCostOptimization', () => {
+    test('calculates shared villa lodging cost per person and nightly breakdown correctly', () => {
+      const res = calculateGroupSharedLodgingCostOptimization(300, 5, 6);
+      expect(res.valid).toBe(true);
+      expect(res.totalLodgingCostUsd).toBe(1500);
+      expect(res.perPersonLodgingCostUsd).toBe(250);
+      expect(res.perPersonNightlyRateUsd).toBe(50);
+      expect(res.recommendation).toContain('Group of 6 sharing villa');
+    });
+
+    test('returns invalid for zero rate or duration', () => {
+      const res = calculateGroupSharedLodgingCostOptimization(0, 5, 6);
+      expect(res.valid).toBe(false);
+      expect(res.perPersonLodgingCostUsd).toBe(0);
+    });
+  });
 });
+
 
 
 
