@@ -26,8 +26,10 @@ import {
   calculateGroupFlightPriceAlertThreshold,
   calculateGroupItineraryTimeSlotConflictScore,
   calculateGroupExpenseEquitabilityIndex,
-  calculateGroupExpenseSettlementOptimizations
+  calculateGroupExpenseSettlementOptimizations,
+  calculateGroupTravelActivityBudgetAllocation
 } from '../splitMath';
+
 
 
 
@@ -512,7 +514,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.totalVolumeSettled).toBe(0);
     });
   });
+
+  describe('calculateGroupTravelActivityBudgetAllocation', () => {
+    test('calculates budget per person and category breakdown correctly', () => {
+      const res = calculateGroupTravelActivityBudgetAllocation(2000, 4, { lodging: 0.4, flights: 0.35, food: 0.15, activities: 0.1 });
+      expect(res.valid).toBe(true);
+      expect(res.totalTravelBudget).toBe(2000);
+      expect(res.participantsCount).toBe(4);
+      expect(res.perPersonBudget).toBe(500);
+      expect(res.categoryBreakdown.lodging).toBe(800);
+      expect(res.categoryBreakdown.flights).toBe(700);
+      expect(res.categoryBreakdown.food).toBe(300);
+      expect(res.categoryBreakdown.activities).toBe(200);
+    });
+
+    test('returns invalid for zero budget or zero participants', () => {
+      const res = calculateGroupTravelActivityBudgetAllocation(0, 4);
+      expect(res.valid).toBe(false);
+      expect(res.perPersonBudget).toBe(0);
+    });
+  });
 });
+
 
 
 

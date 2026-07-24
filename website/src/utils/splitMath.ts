@@ -981,3 +981,48 @@ export function calculateGroupExpenseSettlementOptimizations(
     totalVolumeSettled: Math.round(totalVolume * 100) / 100
   };
 }
+
+export function calculateGroupTravelActivityBudgetAllocation(
+  totalTravelBudget: number = 2000,
+  participantsCount: number = 4,
+  categoryRatios: Record<string, number> = { lodging: 0.4, flights: 0.35, food: 0.15, activities: 0.1 }
+): {
+  valid: boolean;
+  totalTravelBudget: number;
+  participantsCount: number;
+  perPersonBudget: number;
+  categoryBreakdown: Record<string, number>;
+  recommendation: string;
+} {
+  const budget = typeof totalTravelBudget === 'number' && !isNaN(totalTravelBudget) && totalTravelBudget > 0 ? totalTravelBudget : 0;
+  const count = typeof participantsCount === 'number' && !isNaN(participantsCount) && participantsCount > 0 ? Math.floor(participantsCount) : 0;
+
+  if (budget === 0 || count === 0) {
+    return {
+      valid: false,
+      totalTravelBudget: 0,
+      participantsCount: 0,
+      perPersonBudget: 0,
+      categoryBreakdown: {},
+      recommendation: 'Valid total travel budget and participants count are required.'
+    };
+  }
+
+  const perPersonBudget = Math.round((budget / count) * 100) / 100;
+  const categoryBreakdown: Record<string, number> = {};
+
+  for (const [cat, ratio] of Object.entries(categoryRatios)) {
+    const validRatio = typeof ratio === 'number' && ratio >= 0 ? ratio : 0;
+    categoryBreakdown[cat] = Math.round(budget * validRatio * 100) / 100;
+  }
+
+  return {
+    valid: true,
+    totalTravelBudget: budget,
+    participantsCount: count,
+    perPersonBudget,
+    categoryBreakdown,
+    recommendation: `Allocated $${perPersonBudget.toFixed(2)} per person across ${count} travelers.`
+  };
+}
+
