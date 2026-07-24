@@ -1235,7 +1235,77 @@ export function calculateGroupTripCurrencyReserve(
   };
 }
 
+export function calculateGroupBookingPaymentStagingMilestones({
+  totalBookingCostUsd = 1200,
+  depositPercentage = 25,
+  installmentCount = 3,
+  memberCount = 4
+}: {
+  totalBookingCostUsd?: number;
+  depositPercentage?: number;
+  installmentCount?: number;
+  memberCount?: number;
+} = {}): {
+  valid: boolean;
+  totalBookingCostUsd: number;
+  depositAmountUsd: number;
+  perMemberDepositUsd: number;
+  remainingBalanceUsd: number;
+  installmentAmountUsd: number;
+  perMemberInstallmentUsd: number;
+  schedule: Array<{ milestone: string; groupAmountUsd: number; perMemberAmountUsd: number }>;
+  recommendation: string;
+} {
+  if (typeof totalBookingCostUsd !== 'number' || isNaN(totalBookingCostUsd) || totalBookingCostUsd <= 0 ||
+      typeof memberCount !== 'number' || isNaN(memberCount) || memberCount <= 0) {
+    return {
+      valid: false,
+      totalBookingCostUsd: 0,
+      depositAmountUsd: 0,
+      perMemberDepositUsd: 0,
+      remainingBalanceUsd: 0,
+      installmentAmountUsd: 0,
+      perMemberInstallmentUsd: 0,
+      schedule: [],
+      recommendation: 'Valid total cost and member count required.'
+    };
+  }
 
+  const depPct = typeof depositPercentage === 'number' && !isNaN(depositPercentage) && depositPercentage >= 0 && depositPercentage <= 100 ? depositPercentage / 100 : 0.25;
+  const installments = typeof installmentCount === 'number' && !isNaN(installmentCount) && installmentCount > 0 ? Math.min(12, Math.round(installmentCount)) : 3;
 
+  const depositAmountUsd = Math.round(totalBookingCostUsd * depPct * 100) / 100;
+  const perMemberDepositUsd = Math.round((depositAmountUsd / memberCount) * 100) / 100;
 
+  const remainingBalanceUsd = Math.round((totalBookingCostUsd - depositAmountUsd) * 100) / 100;
+  const installmentAmountUsd = Math.round((remainingBalanceUsd / installments) * 100) / 100;
+  const perMemberInstallmentUsd = Math.round((installmentAmountUsd / memberCount) * 100) / 100;
 
+  const schedule = [
+    {
+      milestone: 'Initial Deposit (Booking Lock)',
+      groupAmountUsd: depositAmountUsd,
+      perMemberAmountUsd: perMemberDepositUsd
+    }
+  ];
+
+  for (let i = 1; i <= installments; i++) {
+    schedule.push({
+      milestone: `Installment ${i} of ${installments}`,
+      groupAmountUsd: installmentAmountUsd,
+      perMemberAmountUsd: perMemberInstallmentUsd
+    });
+  }
+
+  return {
+    valid: true,
+    totalBookingCostUsd,
+    depositAmountUsd,
+    perMemberDepositUsd,
+    remainingBalanceUsd,
+    installmentAmountUsd,
+    perMemberInstallmentUsd,
+    schedule,
+    recommendation: `Group deposit of $${depositAmountUsd.toFixed(2)} ($${perMemberDepositUsd.toFixed(2)}/person) required upfront, followed by ${installments} installments of $${installmentAmountUsd.toFixed(2)} ($${perMemberInstallmentUsd.toFixed(2)}/person).`
+  };
+}

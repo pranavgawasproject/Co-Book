@@ -31,8 +31,10 @@ import {
   calculateGroupSharedLodgingCostOptimization,
   calculateGroupTripBudgetVarianceScore,
   calculateGroupSettlementFairnessIndex,
-  calculateGroupTripCurrencyReserve
+  calculateGroupTripCurrencyReserve,
+  calculateGroupBookingPaymentStagingMilestones
 } from '../splitMath';
+
 
 
 
@@ -614,7 +616,36 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.recommendedTotalGroupReserveUsd).toBe(0);
     });
   });
+
+  describe('calculateGroupBookingPaymentStagingMilestones', () => {
+    test('calculates deposit and installment schedule correctly', () => {
+      const res = calculateGroupBookingPaymentStagingMilestones({
+        totalBookingCostUsd: 1200,
+        depositPercentage: 25,
+        installmentCount: 3,
+        memberCount: 4
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalBookingCostUsd).toBe(1200);
+      expect(res.depositAmountUsd).toBe(300);
+      expect(res.perMemberDepositUsd).toBe(75);
+      expect(res.remainingBalanceUsd).toBe(900);
+      expect(res.installmentAmountUsd).toBe(300);
+      expect(res.perMemberInstallmentUsd).toBe(75);
+      expect(res.schedule.length).toBe(4);
+    });
+
+    test('returns invalid for invalid cost or member count', () => {
+      const res = calculateGroupBookingPaymentStagingMilestones({
+        totalBookingCostUsd: -100,
+        memberCount: 0
+      });
+      expect(res.valid).toBe(false);
+      expect(res.schedule.length).toBe(0);
+    });
+  });
 });
+
 
 
 
