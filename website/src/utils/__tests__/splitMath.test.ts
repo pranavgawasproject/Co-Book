@@ -28,7 +28,8 @@ import {
   calculateGroupExpenseEquitabilityIndex,
   calculateGroupExpenseSettlementOptimizations,
   calculateGroupTravelActivityBudgetAllocation,
-  calculateGroupSharedLodgingCostOptimization
+  calculateGroupSharedLodgingCostOptimization,
+  calculateGroupTripBudgetVarianceScore
 } from '../splitMath';
 
 
@@ -551,6 +552,26 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupSharedLodgingCostOptimization(0, 5, 6);
       expect(res.valid).toBe(false);
       expect(res.perPersonLodgingCostUsd).toBe(0);
+    });
+  });
+
+  describe('calculateGroupTripBudgetVarianceScore', () => {
+    test('calculates over-budget variance and per person deviation correctly', () => {
+      const res = calculateGroupTripBudgetVarianceScore(1000, 1200, 4);
+      expect(res.valid).toBe(true);
+      expect(res.plannedBudgetUsd).toBe(1000);
+      expect(res.actualSpentUsd).toBe(1200);
+      expect(res.varianceAmountUsd).toBe(200);
+      expect(res.variancePercentage).toBe(20);
+      expect(res.isOverBudget).toBe(true);
+      expect(res.perPersonVarianceUsd).toBe(50);
+      expect(res.recommendation).toContain('20% over budget');
+    });
+
+    test('returns invalid for non-positive planned budget', () => {
+      const res = calculateGroupTripBudgetVarianceScore(0, 500);
+      expect(res.valid).toBe(false);
+      expect(res.isOverBudget).toBe(false);
     });
   });
 });

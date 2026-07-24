@@ -1064,4 +1064,55 @@ export function calculateGroupSharedLodgingCostOptimization(
   };
 }
 
+export function calculateGroupTripBudgetVarianceScore(
+  plannedBudgetUsd: number = 1000,
+  actualSpentUsd: number = 1200,
+  participantCount: number = 4
+): {
+  valid: boolean;
+  plannedBudgetUsd: number;
+  actualSpentUsd: number;
+  varianceAmountUsd: number;
+  variancePercentage: number;
+  isOverBudget: boolean;
+  perPersonVarianceUsd: number;
+  recommendation: string;
+} {
+  const planned = typeof plannedBudgetUsd === 'number' && plannedBudgetUsd > 0 ? plannedBudgetUsd : 0;
+  const actual = typeof actualSpentUsd === 'number' && actualSpentUsd >= 0 ? actualSpentUsd : 0;
+  const members = typeof participantCount === 'number' && participantCount > 0 ? participantCount : 1;
+
+  if (planned === 0) {
+    return {
+      valid: false,
+      plannedBudgetUsd: 0,
+      actualSpentUsd: 0,
+      varianceAmountUsd: 0,
+      variancePercentage: 0,
+      isOverBudget: false,
+      perPersonVarianceUsd: 0,
+      recommendation: 'Planned budget must be a positive number.'
+    };
+  }
+
+  const varianceAmountUsd = Math.round((actual - planned) * 100) / 100;
+  const variancePercentage = Math.round(((actual - planned) / planned) * 100 * 10) / 10;
+  const isOverBudget = varianceAmountUsd > 0;
+  const perPersonVarianceUsd = Math.round((varianceAmountUsd / members) * 100) / 100;
+
+  return {
+    valid: true,
+    plannedBudgetUsd: planned,
+    actualSpentUsd: actual,
+    varianceAmountUsd,
+    variancePercentage,
+    isOverBudget,
+    perPersonVarianceUsd,
+    recommendation: isOverBudget
+      ? `Actual spend exceeds planned budget by $${varianceAmountUsd.toFixed(2)} (${variancePercentage}% over budget; +$${perPersonVarianceUsd.toFixed(2)} per person).`
+      : `Actual spend is within budget ($${Math.abs(varianceAmountUsd).toFixed(2)} savings).`
+  };
+}
+
+
 
