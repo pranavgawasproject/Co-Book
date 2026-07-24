@@ -25,7 +25,8 @@ import {
   calculateMultiplayerSyncSessionState,
   calculateGroupFlightPriceAlertThreshold,
   calculateGroupItineraryTimeSlotConflictScore,
-  calculateGroupExpenseEquitabilityIndex
+  calculateGroupExpenseEquitabilityIndex,
+  calculateGroupExpenseSettlementOptimizations
 } from '../splitMath';
 
 
@@ -492,7 +493,27 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.isEquitable).toBe(true);
     });
   });
+
+  describe('calculateGroupExpenseSettlementOptimizations', () => {
+    test('optimizes group debt settlements accurately', () => {
+      const balances = { Alice: 100, Bob: -60, Charlie: -40 };
+      const res = calculateGroupExpenseSettlementOptimizations(balances);
+      expect(res.valid).toBe(true);
+      expect(res.totalSettlementCount).toBe(2);
+      expect(res.totalVolumeSettled).toBe(100);
+      expect(res.settlements[0]).toEqual({ from: 'Bob', to: 'Alice', amount: 60 });
+      expect(res.settlements[1]).toEqual({ from: 'Charlie', to: 'Alice', amount: 40 });
+    });
+
+    test('handles empty or zero balances gracefully', () => {
+      const res = calculateGroupExpenseSettlementOptimizations({});
+      expect(res.valid).toBe(false);
+      expect(res.totalSettlementCount).toBe(0);
+      expect(res.totalVolumeSettled).toBe(0);
+    });
+  });
 });
+
 
 
 

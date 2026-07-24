@@ -926,8 +926,58 @@ export function calculateGroupExpenseEquitabilityIndex(
   };
 }
 
+export function calculateGroupExpenseSettlementOptimizations(
+  balances: Record<string, number>
+): {
+  valid: boolean;
+  settlements: Array<{ from: string; to: string; amount: number }>;
+  totalSettlementCount: number;
+  totalVolumeSettled: number;
+} {
+  if (!balances || typeof balances !== 'object' || Object.keys(balances).length === 0) {
+    return { valid: false, settlements: [], totalSettlementCount: 0, totalVolumeSettled: 0 };
+  }
 
+  const debtors: Array<{ name: string; amount: number }> = [];
+  const creditors: Array<{ name: string; amount: number }> = [];
 
+  for (const [name, bal] of Object.entries(balances)) {
+    if (typeof bal !== 'number' || isNaN(bal)) continue;
+    const rounded = Math.round(bal * 100) / 100;
+    if (rounded < -0.01) debtors.push({ name, amount: -rounded });
+    else if (rounded > 0.01) creditors.push({ name, amount: rounded });
+  }
 
+  debtors.sort((a, b) => b.amount - a.amount);
+  creditors.sort((a, b) => b.amount - a.amount);
 
+  const settlements: Array<{ from: string; to: string; amount: number }> = [];
+  let totalVolume = 0;
+  let i = 0;
+  let j = 0;
 
+  while (i < debtors.length && j < creditors.length) {
+    const debt = debtors[i].amount;
+    const cred = creditors[j].amount;
+    const settled = Math.min(debt, cred);
+    const roundedSettled = Math.round(settled * 100) / 100;
+
+    if (roundedSettled > 0) {
+      settlements.push({ from: debtors[i].name, to: creditors[j].name, amount: roundedSettled });
+      totalVolume += roundedSettled;
+    }
+
+    debtors[i].amount -= settled;
+    creditors[j].amount -= settled;
+
+    if (debtors[i].amount < 0.01) i++;
+    if (creditors[j].amount < 0.01) j++;
+  }
+
+  return {
+    valid: true,
+    settlements,
+    totalSettlementCount: settlements.length,
+    totalVolumeSettled: Math.round(totalVolume * 100) / 100
+  };
+}
