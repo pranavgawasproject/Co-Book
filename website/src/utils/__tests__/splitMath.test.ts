@@ -760,6 +760,26 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.breakdown[1].shareUsd).toBeGreaterThan(res.breakdown[0].shareUsd);
       expect(res.recommendation).toContain('Group travel insurance total is $180.00');
     });
+
+    test('generateCollaborativeSessionToken generates clean token and handles invalid input', () => {
+      expect(generateCollaborativeSessionToken('trip-123', 'user-456')).toBe('sync_trip123_user456');
+      expect(generateCollaborativeSessionToken('', 'user-456')).toBe('');
+      expect(generateCollaborativeSessionToken('trip-123', '')).toBe('');
+    });
+
+    test('calculateCategorySpendingBreakdown categorizes and sums expenses accurately', () => {
+      const expenses = [
+        { category: 'Flights', amount: 350.50 },
+        { category: 'Flights', amount: 150.00 },
+        { category: 'Hotels', amount: 200.00 },
+        { amount: 50.00 }
+      ];
+      const res = calculateCategorySpendingBreakdown(expenses);
+      expect(res['Flights']).toBe(500.50);
+      expect(res['Hotels']).toBe(200.00);
+      expect(res['General']).toBe(50.00);
+      expect(calculateCategorySpendingBreakdown(null as unknown as [])).toEqual({});
+    });
   });
 });
 
