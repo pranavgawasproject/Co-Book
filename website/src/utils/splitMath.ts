@@ -1309,3 +1309,65 @@ export function calculateGroupBookingPaymentStagingMilestones({
     recommendation: `Group deposit of $${depositAmountUsd.toFixed(2)} ($${perMemberDepositUsd.toFixed(2)}/person) required upfront, followed by ${installments} installments of $${installmentAmountUsd.toFixed(2)} ($${perMemberInstallmentUsd.toFixed(2)}/person).`
   };
 }
+
+export function calculateGroupFlightCarPoolEfficiencyScore(
+  groupSize: number = 4,
+  totalRentalCarCostUsd: number = 300,
+  individualRideShareCostUsd: number = 80,
+  durationDays: number = 3
+): {
+  valid: boolean;
+  groupSize: number;
+  perPersonRentalCostUsd: number;
+  totalIndividualCostUsd: number;
+  totalCarpoolSavingsUsd: number;
+  perPersonSavingsUsd: number;
+  efficiencyTier: string;
+  recommendation: string;
+} {
+  const members = typeof groupSize === 'number' && groupSize > 0 ? groupSize : 0;
+  const rentalCost = typeof totalRentalCarCostUsd === 'number' && totalRentalCarCostUsd > 0 ? totalRentalCarCostUsd : 0;
+  const rideshareCost = typeof individualRideShareCostUsd === 'number' && individualRideShareCostUsd > 0 ? individualRideShareCostUsd : 0;
+  const days = typeof durationDays === 'number' && durationDays > 0 ? durationDays : 1;
+
+  if (members === 0 || rentalCost === 0 || rideshareCost === 0) {
+    return {
+      valid: false,
+      groupSize: 0,
+      perPersonRentalCostUsd: 0,
+      totalIndividualCostUsd: 0,
+      totalCarpoolSavingsUsd: 0,
+      perPersonSavingsUsd: 0,
+      efficiencyTier: 'INVALID_INPUT',
+      recommendation: 'Valid positive group size, rental cost, and rideshare cost required.'
+    };
+  }
+
+  const perPersonRentalCostUsd = Math.round((rentalCost / members) * 100) / 100;
+  const totalIndividualCostUsd = Math.round(rideshareCost * members * 100) / 100;
+  const totalCarpoolSavingsUsd = Math.round((totalIndividualCostUsd - rentalCost) * 100) / 100;
+  const perPersonSavingsUsd = Math.round((totalCarpoolSavingsUsd / members) * 100) / 100;
+
+  let efficiencyTier = 'CARPOOL_OPTIMAL';
+  if (totalCarpoolSavingsUsd <= -50) efficiencyTier = 'INDIVIDUAL_RIDESHARE_BETTER';
+  else if (Math.abs(totalCarpoolSavingsUsd) < 50) efficiencyTier = 'EQUIVALENT_COST';
+
+  let recommendation = `Group carpool saves $${perPersonSavingsUsd.toFixed(2)} per person compared to individual rideshares over ${days} days.`;
+  if (efficiencyTier === 'INDIVIDUAL_RIDESHARE_BETTER') {
+    recommendation = `Individual rideshares are cheaper by $${Math.abs(perPersonSavingsUsd).toFixed(2)} per person. Skip car rental.`;
+  } else if (efficiencyTier === 'EQUIVALENT_COST') {
+    recommendation = `Cost is nearly equivalent ($${perPersonRentalCostUsd.toFixed(2)} vs $${rideshareCost.toFixed(2)}/person). Choose based on convenience.`;
+  }
+
+  return {
+    valid: true,
+    groupSize: members,
+    perPersonRentalCostUsd,
+    totalIndividualCostUsd,
+    totalCarpoolSavingsUsd,
+    perPersonSavingsUsd,
+    efficiencyTier,
+    recommendation
+  };
+}
+

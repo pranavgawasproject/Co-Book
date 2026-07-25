@@ -32,7 +32,8 @@ import {
   calculateGroupTripBudgetVarianceScore,
   calculateGroupSettlementFairnessIndex,
   calculateGroupTripCurrencyReserve,
-  calculateGroupBookingPaymentStagingMilestones
+  calculateGroupBookingPaymentStagingMilestones,
+  calculateGroupFlightCarPoolEfficiencyScore
 } from '../splitMath';
 
 
@@ -642,6 +643,29 @@ describe('Co-Book Split Math Utility', () => {
       });
       expect(res.valid).toBe(false);
       expect(res.schedule.length).toBe(0);
+    });
+  });
+
+  describe('calculateGroupFlightCarPoolEfficiencyScore', () => {
+    test('calculates optimal carpool savings for large group', () => {
+      const res = calculateGroupFlightCarPoolEfficiencyScore(4, 300, 100, 3);
+      expect(res.valid).toBe(true);
+      expect(res.perPersonRentalCostUsd).toBe(75);
+      expect(res.totalIndividualCostUsd).toBe(400);
+      expect(res.perPersonSavingsUsd).toBe(25);
+      expect(res.efficiencyTier).toBe('CARPOOL_OPTIMAL');
+    });
+
+    test('recommends rideshare when individual option is cheaper', () => {
+      const res = calculateGroupFlightCarPoolEfficiencyScore(2, 400, 50, 2);
+      expect(res.valid).toBe(true);
+      expect(res.efficiencyTier).toBe('INDIVIDUAL_RIDESHARE_BETTER');
+    });
+
+    test('returns error for invalid zero inputs', () => {
+      const res = calculateGroupFlightCarPoolEfficiencyScore(0, 0, 0);
+      expect(res.valid).toBe(false);
+      expect(res.efficiencyTier).toBe('INVALID_INPUT');
     });
   });
 });
