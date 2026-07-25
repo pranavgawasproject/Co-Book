@@ -1371,3 +1371,72 @@ export function calculateGroupFlightCarPoolEfficiencyScore(
   };
 }
 
+export function calculateGroupMultiDestinationItineraryEfficiency(
+  destinations: Array<{ city: string; lodgingCostUsd: number; transitCostUsd: number; stayDays: number }> = []
+): {
+  valid: boolean;
+  totalTripCostUsd: number;
+  averageDailySpendUsd: number;
+  totalDays: number;
+  mostExpensiveCity: string;
+  lodgingVsTransitRatio: number;
+  efficiencyScore: number;
+  recommendation: string;
+} {
+  if (!Array.isArray(destinations) || destinations.length === 0) {
+    return {
+      valid: false,
+      totalTripCostUsd: 0,
+      averageDailySpendUsd: 0,
+      totalDays: 0,
+      mostExpensiveCity: '',
+      lodgingVsTransitRatio: 0,
+      efficiencyScore: 0,
+      recommendation: 'At least one destination is required.'
+    };
+  }
+
+  let totalLodging = 0;
+  let totalTransit = 0;
+  let totalDays = 0;
+  let maxCityCost = -1;
+  let mostExpensiveCity = '';
+
+  for (const dest of destinations) {
+    const lodging = typeof dest.lodgingCostUsd === 'number' && dest.lodgingCostUsd > 0 ? dest.lodgingCostUsd : 0;
+    const transit = typeof dest.transitCostUsd === 'number' && dest.transitCostUsd > 0 ? dest.transitCostUsd : 0;
+    const days = typeof dest.stayDays === 'number' && dest.stayDays > 0 ? dest.stayDays : 1;
+
+    const cityTotal = lodging + transit;
+    totalLodging += lodging;
+    totalTransit += transit;
+    totalDays += days;
+
+    if (cityTotal > maxCityCost) {
+      maxCityCost = cityTotal;
+      mostExpensiveCity = dest.city || 'Unknown';
+    }
+  }
+
+  const totalTripCostUsd = Math.round((totalLodging + totalTransit) * 100) / 100;
+  const averageDailySpendUsd = totalDays > 0 ? Math.round((totalTripCostUsd / totalDays) * 100) / 100 : 0;
+  const lodgingVsTransitRatio = totalTransit > 0 ? Math.round((totalLodging / totalTransit) * 100) / 100 : 10;
+
+  let efficiencyScore = 100;
+  if (lodgingVsTransitRatio < 1.5) efficiencyScore -= 20; // High transit relative to stay
+  if (averageDailySpendUsd > 300) efficiencyScore -= 15;
+  efficiencyScore = Math.max(0, Math.min(100, efficiencyScore));
+
+  return {
+    valid: true,
+    totalTripCostUsd,
+    averageDailySpendUsd,
+    totalDays,
+    mostExpensiveCity,
+    lodgingVsTransitRatio,
+    efficiencyScore,
+    recommendation: `Multi-city itinerary total: $${totalTripCostUsd.toFixed(2)} over ${totalDays} days ($${averageDailySpendUsd.toFixed(2)}/day). Peak cost city: ${mostExpensiveCity}.`
+  };
+}
+
+

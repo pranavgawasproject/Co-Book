@@ -33,7 +33,8 @@ import {
   calculateGroupSettlementFairnessIndex,
   calculateGroupTripCurrencyReserve,
   calculateGroupBookingPaymentStagingMilestones,
-  calculateGroupFlightCarPoolEfficiencyScore
+  calculateGroupFlightCarPoolEfficiencyScore,
+  calculateGroupMultiDestinationItineraryEfficiency
 } from '../splitMath';
 
 
@@ -668,7 +669,30 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.efficiencyTier).toBe('INVALID_INPUT');
     });
   });
+
+  describe('calculateGroupMultiDestinationItineraryEfficiency', () => {
+    test('calculates itinerary efficiency and peak cost city accurately', () => {
+      const destinations = [
+        { city: 'Tokyo', lodgingCostUsd: 800, transitCostUsd: 200, stayDays: 4 },
+        { city: 'Kyoto', lodgingCostUsd: 400, transitCostUsd: 100, stayDays: 2 }
+      ];
+      const res = calculateGroupMultiDestinationItineraryEfficiency(destinations);
+      expect(res.valid).toBe(true);
+      expect(res.totalTripCostUsd).toBe(1500);
+      expect(res.averageDailySpendUsd).toBe(250);
+      expect(res.totalDays).toBe(6);
+      expect(res.mostExpensiveCity).toBe('Tokyo');
+      expect(res.efficiencyScore).toBe(100);
+    });
+
+    test('handles empty destinations array gracefully', () => {
+      const res = calculateGroupMultiDestinationItineraryEfficiency([]);
+      expect(res.valid).toBe(false);
+      expect(res.totalTripCostUsd).toBe(0);
+    });
+  });
 });
+
 
 
 
