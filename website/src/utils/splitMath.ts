@@ -1625,6 +1625,61 @@ export function calculateGroupTravelInsurancePayerDistribution({
   };
 }
 
+export function calculateGroupTripEmergencyContingencyReserve(
+  totalTripExpenses: number = 5000,
+  memberCount: number = 4,
+  tripDurationDays: number = 7,
+  destinationRiskTier: 'standard' | 'adventure' | 'remote' = 'standard'
+): {
+  valid: boolean;
+  totalTripExpenses: number;
+  memberCount: number;
+  tripDurationDays: number;
+  recommendedReservePercentage: number;
+  totalReserveAmountUsd: number;
+  perMemberReserveContributionUsd: number;
+  dailyContingencyAllowanceUsd: number;
+  recommendation: string;
+} {
+  const expenses = typeof totalTripExpenses === 'number' && !isNaN(totalTripExpenses) && totalTripExpenses > 0 ? totalTripExpenses : 0;
+  const members = typeof memberCount === 'number' && !isNaN(memberCount) && memberCount > 0 ? Math.floor(memberCount) : 0;
+  const days = typeof tripDurationDays === 'number' && !isNaN(tripDurationDays) && tripDurationDays > 0 ? Math.floor(tripDurationDays) : 0;
+
+  if (expenses === 0 || members === 0 || days === 0) {
+    return {
+      valid: false,
+      totalTripExpenses: 0,
+      memberCount: 0,
+      tripDurationDays: 0,
+      recommendedReservePercentage: 0,
+      totalReserveAmountUsd: 0,
+      perMemberReserveContributionUsd: 0,
+      dailyContingencyAllowanceUsd: 0,
+      recommendation: 'Valid trip expenses, member count, and duration days are required.'
+    };
+  }
+
+  let reservePct = 15;
+  if (destinationRiskTier === 'adventure') reservePct = 25;
+  else if (destinationRiskTier === 'remote') reservePct = 35;
+
+  const totalReserveAmountUsd = Math.round(expenses * (reservePct / 100) * 100) / 100;
+  const perMemberReserveContributionUsd = Math.round((totalReserveAmountUsd / members) * 100) / 100;
+  const dailyContingencyAllowanceUsd = Math.round((totalReserveAmountUsd / days) * 100) / 100;
+
+  return {
+    valid: true,
+    totalTripExpenses: expenses,
+    memberCount: members,
+    tripDurationDays: days,
+    recommendedReservePercentage: reservePct,
+    totalReserveAmountUsd,
+    perMemberReserveContributionUsd,
+    dailyContingencyAllowanceUsd,
+    recommendation: `Recommended emergency contingency reserve is $${totalReserveAmountUsd.toFixed(2)} (${reservePct}% of trip budget), requiring $${perMemberReserveContributionUsd.toFixed(2)} contribution per member.`
+  };
+}
+
 
 
 

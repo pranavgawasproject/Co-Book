@@ -37,8 +37,10 @@ import {
   calculateGroupMultiDestinationItineraryEfficiency,
   calculateGroupActivityTicketBulkDiscount,
   calculateGroupTripBudgetVarianceAnalysis,
-  calculateGroupTravelInsurancePayerDistribution
+  calculateGroupTravelInsurancePayerDistribution,
+  calculateGroupTripEmergencyContingencyReserve
 } from '../splitMath';
+
 
 
 
@@ -781,7 +783,33 @@ describe('Co-Book Split Math Utility', () => {
       expect(calculateCategorySpendingBreakdown(null as unknown as [])).toEqual({});
     });
   });
+
+  describe('calculateGroupTripEmergencyContingencyReserve', () => {
+    test('calculates recommended contingency reserve and per-member contribution correctly', () => {
+      const res = calculateGroupTripEmergencyContingencyReserve(5000, 4, 7, 'standard');
+      expect(res.valid).toBe(true);
+      expect(res.totalReserveAmountUsd).toBe(750);
+      expect(res.perMemberReserveContributionUsd).toBe(187.5);
+      expect(res.recommendedReservePercentage).toBe(15);
+      expect(res.recommendation).toContain('Recommended emergency contingency reserve is $750.00');
+    });
+
+    test('applies higher reserve percentage for remote destination risk tier', () => {
+      const res = calculateGroupTripEmergencyContingencyReserve(10000, 5, 10, 'remote');
+      expect(res.valid).toBe(true);
+      expect(res.recommendedReservePercentage).toBe(35);
+      expect(res.totalReserveAmountUsd).toBe(3500);
+    });
+
+    test('returns invalid for zero expenses or zero duration', () => {
+      const res = calculateGroupTripEmergencyContingencyReserve(0, 4, 7);
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toContain('Valid trip expenses');
+    });
+  });
 });
+
+
 
 
 
