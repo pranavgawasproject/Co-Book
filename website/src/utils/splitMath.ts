@@ -1498,5 +1498,72 @@ export function calculateGroupActivityTicketBulkDiscount(
   };
 }
 
+export function calculateGroupTripBudgetVarianceAnalysis(
+  allocatedBudgetUsd: number,
+  actualSpentUsd: number,
+  totalDays: number,
+  daysElapsed: number
+): {
+  valid: boolean;
+  allocatedBudgetUsd: number;
+  actualSpentUsd: number;
+  varianceUsd: number;
+  variancePercentage: number;
+  dailySpendRateUsd: number;
+  projectedTotalSpendUsd: number;
+  budgetStatus: 'UNDER_BUDGET' | 'ON_TRACK' | 'OVER_BUDGET';
+  recommendedDailyLimitForRemainingDaysUsd: number;
+  recommendation: string;
+} {
+  const budget = typeof allocatedBudgetUsd === 'number' && allocatedBudgetUsd > 0 ? allocatedBudgetUsd : 0;
+  const spent = typeof actualSpentUsd === 'number' && actualSpentUsd >= 0 ? actualSpentUsd : 0;
+  const totalD = typeof totalDays === 'number' && totalDays > 0 ? totalDays : 1;
+  const elapsedD = typeof daysElapsed === 'number' && daysElapsed >= 0 ? Math.min(totalD, daysElapsed) : 0;
+
+  if (budget === 0) {
+    return {
+      valid: false,
+      allocatedBudgetUsd: 0,
+      actualSpentUsd: 0,
+      varianceUsd: 0,
+      variancePercentage: 0,
+      dailySpendRateUsd: 0,
+      projectedTotalSpendUsd: 0,
+      budgetStatus: 'ON_TRACK',
+      recommendedDailyLimitForRemainingDaysUsd: 0,
+      recommendation: 'Allocated budget must be greater than zero.'
+    };
+  }
+
+  const varianceUsd = Math.round((budget - spent) * 100) / 100;
+  const variancePercentage = Math.round(((spent - budget) / budget) * 100 * 10) / 10;
+  const dailySpendRateUsd = elapsedD > 0 ? Math.round((spent / elapsedD) * 100) / 100 : 0;
+  const projectedTotalSpendUsd = Math.round((dailySpendRateUsd * totalD) * 100) / 100;
+
+  let budgetStatus: 'UNDER_BUDGET' | 'ON_TRACK' | 'OVER_BUDGET' = 'ON_TRACK';
+  if (projectedTotalSpendUsd > budget * 1.05) budgetStatus = 'OVER_BUDGET';
+  else if (projectedTotalSpendUsd < budget * 0.95) budgetStatus = 'UNDER_BUDGET';
+
+  const remainingDays = totalD - elapsedD;
+  const remainingBudget = Math.max(0, budget - spent);
+  const recommendedDailyLimitForRemainingDaysUsd = remainingDays > 0 ? Math.round((remainingBudget / remainingDays) * 100) / 100 : 0;
+
+  return {
+    valid: true,
+    allocatedBudgetUsd: budget,
+    actualSpentUsd: spent,
+    varianceUsd,
+    variancePercentage,
+    dailySpendRateUsd,
+    projectedTotalSpendUsd,
+    budgetStatus,
+    recommendedDailyLimitForRemainingDaysUsd,
+    recommendation: budgetStatus === 'OVER_BUDGET'
+      ? `Warning: Group is spending $${dailySpendRateUsd}/day and projected to exceed budget by $${(projectedTotalSpendUsd - budget).toFixed(2)}. Adjust remaining daily spend limit to $${recommendedDailyLimitForRemainingDaysUsd}/day.`
+      : `Group budget status is ${budgetStatus.toLowerCase().replace('_', ' ')}. Spending $${dailySpendRateUsd}/day with recommended remaining limit of $${recommendedDailyLimitForRemainingDaysUsd}/day.`
+  };
+}
+
+
 
 

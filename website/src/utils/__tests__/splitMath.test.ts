@@ -35,7 +35,8 @@ import {
   calculateGroupBookingPaymentStagingMilestones,
   calculateGroupFlightCarPoolEfficiencyScore,
   calculateGroupMultiDestinationItineraryEfficiency,
-  calculateGroupActivityTicketBulkDiscount
+  calculateGroupActivityTicketBulkDiscount,
+  calculateGroupTripBudgetVarianceAnalysis
 } from '../splitMath';
 
 
@@ -719,7 +720,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.totalWithoutDiscountUsd).toBe(0);
     });
   });
+
+  describe('calculateGroupTripBudgetVarianceAnalysis', () => {
+    test('calculates spending rate, projected spend, and remaining daily limit accurately', () => {
+      const res = calculateGroupTripBudgetVarianceAnalysis(1000, 600, 10, 5);
+      expect(res.valid).toBe(true);
+      expect(res.allocatedBudgetUsd).toBe(1000);
+      expect(res.actualSpentUsd).toBe(600);
+      expect(res.dailySpendRateUsd).toBe(120);
+      expect(res.projectedTotalSpendUsd).toBe(1200);
+      expect(res.budgetStatus).toBe('OVER_BUDGET');
+      expect(res.recommendedDailyLimitForRemainingDaysUsd).toBe(80);
+      expect(res.recommendation).toContain('Warning: Group is spending $120/day');
+    });
+
+    test('returns invalid for zero budget', () => {
+      const res = calculateGroupTripBudgetVarianceAnalysis(0, 100, 5, 2);
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toContain('Allocated budget must be greater than zero.');
+    });
+  });
 });
+
 
 
 
