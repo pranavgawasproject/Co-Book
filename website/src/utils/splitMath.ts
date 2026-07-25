@@ -1564,6 +1564,67 @@ export function calculateGroupTripBudgetVarianceAnalysis(
   };
 }
 
+export function calculateGroupTravelInsurancePayerDistribution({
+  basePolicyCostUsd = 200,
+  groupDiscountPercentage = 10,
+  participants = [
+    { name: 'Alice', age: 28, isHighRiskActivity: false },
+    { name: 'Bob', age: 62, isHighRiskActivity: true }
+  ]
+}: {
+  basePolicyCostUsd?: number;
+  groupDiscountPercentage?: number;
+  participants?: Array<{ name: string; age?: number; isHighRiskActivity?: boolean }>;
+} = {}): {
+  valid: boolean;
+  basePolicyCostUsd: number;
+  groupDiscountPercentage: number;
+  totalGroupCostUsd: number;
+  savingsUsd: number;
+  breakdown: Array<{ name: string; shareUsd: number; riskFactor: number }>;
+  recommendation: string;
+} {
+  const baseCost = typeof basePolicyCostUsd === 'number' && basePolicyCostUsd > 0 ? basePolicyCostUsd : 200;
+  const discountPct = typeof groupDiscountPercentage === 'number' && groupDiscountPercentage >= 0 ? groupDiscountPercentage : 0;
+  const members = Array.isArray(participants) && participants.length > 0 ? participants : [{ name: 'Traveler 1' }];
+
+  const memberMetrics = members.map(m => {
+    const age = typeof m.age === 'number' ? m.age : 30;
+    let riskFactor = 1.0;
+    if (age >= 60) riskFactor = 1.5;
+    else if (age >= 45) riskFactor = 1.25;
+    if (m.isHighRiskActivity) riskFactor += 0.25;
+
+    return {
+      name: m.name || 'Traveler',
+      riskFactor
+    };
+  });
+
+  const totalRiskUnits = memberMetrics.reduce((sum, m) => sum + m.riskFactor, 0);
+  const discountedTotalCost = baseCost * (1 - discountPct / 100);
+  const savings = Math.round((baseCost - discountedTotalCost) * 100) / 100;
+
+  const breakdown = memberMetrics.map(m => {
+    const shareUsd = Math.round((discountedTotalCost * (m.riskFactor / totalRiskUnits)) * 100) / 100;
+    return {
+      name: m.name,
+      shareUsd,
+      riskFactor: m.riskFactor
+    };
+  });
+
+  return {
+    valid: true,
+    basePolicyCostUsd: baseCost,
+    groupDiscountPercentage: discountPct,
+    totalGroupCostUsd: Math.round(discountedTotalCost * 100) / 100,
+    savingsUsd: savings,
+    breakdown,
+    recommendation: `Group travel insurance total is $${discountedTotalCost.toFixed(2)} with $${savings.toFixed(2)} group discount savings split fairly across ${members.length} travelers based on risk factors.`
+  };
+}
+
 
 
 

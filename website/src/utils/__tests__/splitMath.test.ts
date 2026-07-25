@@ -36,7 +36,8 @@ import {
   calculateGroupFlightCarPoolEfficiencyScore,
   calculateGroupMultiDestinationItineraryEfficiency,
   calculateGroupActivityTicketBulkDiscount,
-  calculateGroupTripBudgetVarianceAnalysis
+  calculateGroupTripBudgetVarianceAnalysis,
+  calculateGroupTravelInsurancePayerDistribution
 } from '../splitMath';
 
 
@@ -738,6 +739,26 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTripBudgetVarianceAnalysis(0, 100, 5, 2);
       expect(res.valid).toBe(false);
       expect(res.recommendation).toContain('Allocated budget must be greater than zero.');
+    });
+  });
+
+  describe('calculateGroupTravelInsurancePayerDistribution', () => {
+    test('calculates group insurance cost breakdown and group discount savings accurately', () => {
+      const res = calculateGroupTravelInsurancePayerDistribution({
+        basePolicyCostUsd: 200,
+        groupDiscountPercentage: 10,
+        participants: [
+          { name: 'Alice', age: 28, isHighRiskActivity: false },
+          { name: 'Bob', age: 62, isHighRiskActivity: true }
+        ]
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalGroupCostUsd).toBe(180);
+      expect(res.savingsUsd).toBe(20);
+      expect(res.breakdown[0].name).toBe('Alice');
+      expect(res.breakdown[1].name).toBe('Bob');
+      expect(res.breakdown[1].shareUsd).toBeGreaterThan(res.breakdown[0].shareUsd);
+      expect(res.recommendation).toContain('Group travel insurance total is $180.00');
     });
   });
 });
