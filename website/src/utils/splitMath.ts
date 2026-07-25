@@ -1680,6 +1680,68 @@ export function calculateGroupTripEmergencyContingencyReserve(
   };
 }
 
+export function calculateGroupTripCarbonAndBudgetEfficiency(
+  groupSize: number = 4,
+  totalDistanceKm: number = 1000,
+  transportMode: 'flight' | 'train' | 'carpool' = 'train',
+  totalLodgingCost: number = 800
+): {
+  valid: boolean;
+  groupSize: number;
+  totalCo2KgPerPerson: number;
+  co2SavingsPercent: number;
+  costSavingsPerPersonUsd: number;
+  ecoBudgetEfficiencyIndex: number;
+  efficiencyRating: string;
+  recommendation: string;
+} {
+  const members = typeof groupSize === 'number' && groupSize > 0 ? Math.floor(groupSize) : 0;
+  const distance = typeof totalDistanceKm === 'number' && totalDistanceKm > 0 ? totalDistanceKm : 0;
+
+  if (members === 0 || distance === 0) {
+    return {
+      valid: false,
+      groupSize: 0,
+      totalCo2KgPerPerson: 0,
+      co2SavingsPercent: 0,
+      costSavingsPerPersonUsd: 0,
+      ecoBudgetEfficiencyIndex: 0,
+      efficiencyRating: 'INVALID_INPUT',
+      recommendation: 'Valid group size and distance in km are required.'
+    };
+  }
+
+  let co2PerKm = 0.25; // flight baseline
+  if (transportMode === 'train') co2PerKm = 0.04;
+  else if (transportMode === 'carpool') co2PerKm = 0.12 / members;
+
+  const totalCo2KgPerPerson = Math.round(distance * co2PerKm * 100) / 100;
+  const flightBaselineCo2 = distance * 0.25;
+  const co2SavingsPercent = Math.max(0, Math.round(((flightBaselineCo2 - totalCo2KgPerPerson) / flightBaselineCo2) * 100));
+
+  const perPersonLodgingUsd = Math.round((totalLodgingCost / members) * 100) / 100;
+  const soloLodgingBaselineUsd = totalLodgingCost;
+  const costSavingsPerPersonUsd = Math.round((soloLodgingBaselineUsd - perPersonLodgingUsd) * 100) / 100;
+
+  const ecoBudgetEfficiencyIndex = Math.min(100, Math.round((co2SavingsPercent * 0.5) + Math.min(50, (costSavingsPerPersonUsd / soloLodgingBaselineUsd) * 50)));
+
+  let efficiencyRating = 'HIGH_EFFICIENCY';
+  if (ecoBudgetEfficiencyIndex < 40) efficiencyRating = 'LOW_EFFICIENCY';
+  else if (ecoBudgetEfficiencyIndex < 75) efficiencyRating = 'MODERATE_EFFICIENCY';
+
+  return {
+    valid: true,
+    groupSize: members,
+    totalCo2KgPerPerson,
+    co2SavingsPercent,
+    costSavingsPerPersonUsd,
+    ecoBudgetEfficiencyIndex,
+    efficiencyRating,
+    recommendation: `Group travel (${members} members, ${transportMode}) saves ${co2SavingsPercent}% CO2 and $${costSavingsPerPersonUsd.toFixed(2)} lodging cost per person (Eco-Budget Score: ${ecoBudgetEfficiencyIndex}/100).`
+  };
+}
+
+
 
 
 

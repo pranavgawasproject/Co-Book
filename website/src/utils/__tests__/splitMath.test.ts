@@ -38,7 +38,8 @@ import {
   calculateGroupActivityTicketBulkDiscount,
   calculateGroupTripBudgetVarianceAnalysis,
   calculateGroupTravelInsurancePayerDistribution,
-  calculateGroupTripEmergencyContingencyReserve
+  calculateGroupTripEmergencyContingencyReserve,
+  calculateGroupTripCarbonAndBudgetEfficiency
 } from '../splitMath';
 
 
@@ -805,6 +806,24 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTripEmergencyContingencyReserve(0, 4, 7);
       expect(res.valid).toBe(false);
       expect(res.recommendation).toContain('Valid trip expenses');
+    });
+  });
+
+  describe('calculateGroupTripCarbonAndBudgetEfficiency', () => {
+    test('calculates carbon and budget savings correctly for group train travel', () => {
+      const res = calculateGroupTripCarbonAndBudgetEfficiency(4, 1000, 'train', 800);
+      expect(res.valid).toBe(true);
+      expect(res.totalCo2KgPerPerson).toBe(40);
+      expect(res.co2SavingsPercent).toBe(84);
+      expect(res.costSavingsPerPersonUsd).toBe(600); // 800 - 200
+      expect(res.efficiencyRating).toBe('HIGH_EFFICIENCY');
+      expect(res.recommendation).toContain('Group travel (4 members, train)');
+    });
+
+    test('returns invalid for zero group size or zero distance', () => {
+      const res = calculateGroupTripCarbonAndBudgetEfficiency(0, 0);
+      expect(res.valid).toBe(false);
+      expect(res.efficiencyRating).toBe('INVALID_INPUT');
     });
   });
 });
