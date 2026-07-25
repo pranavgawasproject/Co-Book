@@ -1439,4 +1439,64 @@ export function calculateGroupMultiDestinationItineraryEfficiency(
   };
 }
 
+export function calculateGroupActivityTicketBulkDiscount(
+  individualTicketPriceUsd: number = 50,
+  groupSize: number = 8,
+  bulkDiscountPercentage: number = 15
+): {
+  valid: boolean;
+  individualTicketPriceUsd: number;
+  groupSize: number;
+  bulkDiscountPercentage: number;
+  totalWithoutDiscountUsd: number;
+  totalWithDiscountUsd: number;
+  perPersonDiscountedPriceUsd: number;
+  totalGroupSavingsUsd: number;
+  isBulkDiscountApplied: boolean;
+  recommendation: string;
+} {
+  const price = typeof individualTicketPriceUsd === 'number' && individualTicketPriceUsd > 0 ? individualTicketPriceUsd : 0;
+  const size = typeof groupSize === 'number' && groupSize > 0 ? Math.floor(groupSize) : 0;
+
+  if (price === 0 || size === 0) {
+    return {
+      valid: false,
+      individualTicketPriceUsd: 0,
+      groupSize: 0,
+      bulkDiscountPercentage: 0,
+      totalWithoutDiscountUsd: 0,
+      totalWithDiscountUsd: 0,
+      perPersonDiscountedPriceUsd: 0,
+      totalGroupSavingsUsd: 0,
+      isBulkDiscountApplied: false,
+      recommendation: 'Valid individual ticket price and group size required.'
+    };
+  }
+
+  const discountPct = typeof bulkDiscountPercentage === 'number' && bulkDiscountPercentage >= 0 ? Math.min(100, bulkDiscountPercentage) : 0;
+  const isBulkDiscountApplied = size >= 5 && discountPct > 0;
+  const effectiveDiscount = isBulkDiscountApplied ? discountPct / 100 : 0;
+
+  const totalWithoutDiscountUsd = Math.round(price * size * 100) / 100;
+  const perPersonDiscountedPriceUsd = Math.round(price * (1 - effectiveDiscount) * 100) / 100;
+  const totalWithDiscountUsd = Math.round(perPersonDiscountedPriceUsd * size * 100) / 100;
+  const totalGroupSavingsUsd = Math.round((totalWithoutDiscountUsd - totalWithDiscountUsd) * 100) / 100;
+
+  return {
+    valid: true,
+    individualTicketPriceUsd: price,
+    groupSize: size,
+    bulkDiscountPercentage: discountPct,
+    totalWithoutDiscountUsd,
+    totalWithDiscountUsd,
+    perPersonDiscountedPriceUsd,
+    totalGroupSavingsUsd,
+    isBulkDiscountApplied,
+    recommendation: isBulkDiscountApplied
+      ? `Group bulk discount of ${discountPct}% applied! Group saves $${totalGroupSavingsUsd.toFixed(2)} ($${perPersonDiscountedPriceUsd.toFixed(2)}/person vs $${price.toFixed(2)}).`
+      : `Group size of ${size} does not trigger bulk discount (minimum 5 required).`
+  };
+}
+
+
 

@@ -34,8 +34,10 @@ import {
   calculateGroupTripCurrencyReserve,
   calculateGroupBookingPaymentStagingMilestones,
   calculateGroupFlightCarPoolEfficiencyScore,
-  calculateGroupMultiDestinationItineraryEfficiency
+  calculateGroupMultiDestinationItineraryEfficiency,
+  calculateGroupActivityTicketBulkDiscount
 } from '../splitMath';
+
 
 
 
@@ -691,7 +693,34 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.totalTripCostUsd).toBe(0);
     });
   });
+
+  describe('calculateGroupActivityTicketBulkDiscount', () => {
+    test('calculates bulk discount correctly when group size threshold is met', () => {
+      const res = calculateGroupActivityTicketBulkDiscount(50, 8, 15);
+      expect(res.valid).toBe(true);
+      expect(res.totalWithoutDiscountUsd).toBe(400);
+      expect(res.perPersonDiscountedPriceUsd).toBe(42.5);
+      expect(res.totalWithDiscountUsd).toBe(340);
+      expect(res.totalGroupSavingsUsd).toBe(60);
+      expect(res.isBulkDiscountApplied).toBe(true);
+      expect(res.recommendation).toContain('Group bulk discount of 15% applied!');
+    });
+
+    test('does not apply discount if group size is below 5', () => {
+      const res = calculateGroupActivityTicketBulkDiscount(50, 3, 15);
+      expect(res.valid).toBe(true);
+      expect(res.isBulkDiscountApplied).toBe(false);
+      expect(res.totalGroupSavingsUsd).toBe(0);
+    });
+
+    test('returns invalid for non-positive ticket price or group size', () => {
+      const res = calculateGroupActivityTicketBulkDiscount(0, 0);
+      expect(res.valid).toBe(false);
+      expect(res.totalWithoutDiscountUsd).toBe(0);
+    });
+  });
 });
+
 
 
 
