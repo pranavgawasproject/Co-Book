@@ -1741,6 +1741,68 @@ export function calculateGroupTripCarbonAndBudgetEfficiency(
   };
 }
 
+export function calculateGroupTripBudgetForecastAndOptimization(
+  totalGroupBudgetUsd: number = 2000,
+  committedExpensesUsd: number = 1400,
+  groupSize: number = 4,
+  daysRemaining: number = 5
+): {
+  valid: boolean;
+  totalGroupBudgetUsd: number;
+  committedExpensesUsd: number;
+  remainingBufferUsd: number;
+  dailySpendablePerPersonUsd: number;
+  budgetBufferPercent: number;
+  isBudgetSafe: boolean;
+  budgetHealthRating: string;
+  recommendation: string;
+} {
+  const budget = typeof totalGroupBudgetUsd === 'number' && totalGroupBudgetUsd > 0 ? totalGroupBudgetUsd : 0;
+  const committed = typeof committedExpensesUsd === 'number' && committedExpensesUsd >= 0 ? committedExpensesUsd : 0;
+  const members = typeof groupSize === 'number' && groupSize > 0 ? Math.floor(groupSize) : 1;
+  const days = typeof daysRemaining === 'number' && daysRemaining > 0 ? Math.floor(daysRemaining) : 1;
+
+  if (budget === 0) {
+    return {
+      valid: false,
+      totalGroupBudgetUsd: 0,
+      committedExpensesUsd: 0,
+      remainingBufferUsd: 0,
+      dailySpendablePerPersonUsd: 0,
+      budgetBufferPercent: 0,
+      isBudgetSafe: false,
+      budgetHealthRating: 'INVALID_INPUT',
+      recommendation: 'Total group budget must be greater than 0.'
+    };
+  }
+
+  const remainingBufferUsd = Math.round((budget - committed) * 100) / 100;
+  const budgetBufferPercent = Math.max(0, Math.round((remainingBufferUsd / budget) * 100));
+  const dailySpendablePerPersonUsd = Math.max(0, Math.round((remainingBufferUsd / (members * days)) * 100) / 100);
+
+  const isBudgetSafe = remainingBufferUsd >= 0 && budgetBufferPercent >= 15;
+  let budgetHealthRating = 'HEALTHY';
+  if (remainingBufferUsd < 0) budgetHealthRating = 'OVER_BUDGET';
+  else if (budgetBufferPercent < 15) budgetHealthRating = 'TIGHT_BUFFER';
+
+  return {
+    valid: true,
+    totalGroupBudgetUsd: budget,
+    committedExpensesUsd: committed,
+    remainingBufferUsd,
+    dailySpendablePerPersonUsd,
+    budgetBufferPercent,
+    isBudgetSafe,
+    budgetHealthRating,
+    recommendation: isBudgetSafe
+      ? `Group trip budget is healthy with $${remainingBufferUsd.toFixed(2)} buffer (${budgetBufferPercent}% remaining, $${dailySpendablePerPersonUsd.toFixed(2)}/day per person).`
+      : budgetHealthRating === 'OVER_BUDGET'
+      ? `Trip expenses exceed total budget by $${Math.abs(remainingBufferUsd).toFixed(2)}. Adjust planned group activities.`
+      : `Tight budget buffer remaining ($${remainingBufferUsd.toFixed(2)} left for ${days} days).`
+  };
+}
+
+
 
 
 

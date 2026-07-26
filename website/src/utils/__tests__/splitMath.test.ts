@@ -39,8 +39,10 @@ import {
   calculateGroupTripBudgetVarianceAnalysis,
   calculateGroupTravelInsurancePayerDistribution,
   calculateGroupTripEmergencyContingencyReserve,
-  calculateGroupTripCarbonAndBudgetEfficiency
+  calculateGroupTripCarbonAndBudgetEfficiency,
+  calculateGroupTripBudgetForecastAndOptimization
 } from '../splitMath';
+
 
 
 
@@ -826,7 +828,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.efficiencyRating).toBe('INVALID_INPUT');
     });
   });
+
+  describe('calculateGroupTripBudgetForecastAndOptimization', () => {
+    test('calculates budget forecast and daily spendable rate per person correctly', () => {
+      const res = calculateGroupTripBudgetForecastAndOptimization(2000, 1400, 4, 5);
+      expect(res.valid).toBe(true);
+      expect(res.remainingBufferUsd).toBe(600);
+      expect(res.budgetBufferPercent).toBe(30);
+      expect(res.dailySpendablePerPersonUsd).toBe(30);
+      expect(res.isBudgetSafe).toBe(true);
+      expect(res.budgetHealthRating).toBe('HEALTHY');
+    });
+
+    test('identifies over-budget state when expenses exceed total budget', () => {
+      const res = calculateGroupTripBudgetForecastAndOptimization(1000, 1200, 2, 3);
+      expect(res.valid).toBe(true);
+      expect(res.remainingBufferUsd).toBe(-200);
+      expect(res.isBudgetSafe).toBe(false);
+      expect(res.budgetHealthRating).toBe('OVER_BUDGET');
+    });
+  });
 });
+
 
 
 
