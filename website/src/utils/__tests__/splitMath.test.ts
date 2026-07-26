@@ -40,7 +40,8 @@ import {
   calculateGroupTravelInsurancePayerDistribution,
   calculateGroupTripEmergencyContingencyReserve,
   calculateGroupTripCarbonAndBudgetEfficiency,
-  calculateGroupTripBudgetForecastAndOptimization
+  calculateGroupTripBudgetForecastAndOptimization,
+  calculateGroupTripCancellationRefundDistribution
 } from '../splitMath';
 
 
@@ -848,7 +849,30 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.budgetHealthRating).toBe('OVER_BUDGET');
     });
   });
+
+  describe('calculateGroupTripCancellationRefundDistribution', () => {
+    test('calculates cancellation refund distribution per participant accurately', () => {
+      const res = calculateGroupTripCancellationRefundDistribution({
+        totalBookingCostUsd: 1000,
+        grossRefundAmountUsd: 800,
+        cancellationFeeUsd: 100,
+        participantContributions: { Alice: 600, Bob: 400 }
+      });
+      expect(res.valid).toBe(true);
+      expect(res.netRefundPoolUsd).toBe(700);
+      expect(res.refundPercentage).toBe(70);
+      expect(res.participantRefunds.Alice).toBe(420); // 700 * 0.6
+      expect(res.participantRefunds.Bob).toBe(280);   // 700 * 0.4
+    });
+
+    test('returns invalid state for non-positive total booking cost', () => {
+      const res = calculateGroupTripCancellationRefundDistribution({ totalBookingCostUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toBe('Total booking cost must be greater than 0.');
+    });
+  });
 });
+
 
 
 

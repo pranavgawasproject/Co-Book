@@ -1802,6 +1802,72 @@ export function calculateGroupTripBudgetForecastAndOptimization(
   };
 }
 
+export function calculateGroupTripCancellationRefundDistribution({
+  totalBookingCostUsd = 1200,
+  grossRefundAmountUsd = 900,
+  cancellationFeeUsd = 100,
+  participantContributions = {}
+}: {
+  totalBookingCostUsd?: number;
+  grossRefundAmountUsd?: number;
+  cancellationFeeUsd?: number;
+  participantContributions?: Record<string, number>;
+} = {}): {
+  valid: boolean;
+  totalBookingCostUsd: number;
+  grossRefundAmountUsd: number;
+  netRefundPoolUsd: number;
+  cancellationFeeUsd: number;
+  participantRefunds: Record<string, number>;
+  refundPercentage: number;
+  recommendation: string;
+} {
+  const cost = typeof totalBookingCostUsd === 'number' && totalBookingCostUsd > 0 ? totalBookingCostUsd : 0;
+  const gross = typeof grossRefundAmountUsd === 'number' && grossRefundAmountUsd >= 0 ? grossRefundAmountUsd : 0;
+  const fee = typeof cancellationFeeUsd === 'number' && cancellationFeeUsd >= 0 ? cancellationFeeUsd : 0;
+
+  if (cost === 0) {
+    return {
+      valid: false,
+      totalBookingCostUsd: 0,
+      grossRefundAmountUsd: 0,
+      netRefundPoolUsd: 0,
+      cancellationFeeUsd: 0,
+      participantRefunds: {},
+      refundPercentage: 0,
+      recommendation: 'Total booking cost must be greater than 0.'
+    };
+  }
+
+  const netRefundPoolUsd = Math.max(0, Math.round((gross - fee) * 100) / 100);
+  const refundPercentage = Math.round((netRefundPoolUsd / cost) * 100 * 10) / 10;
+
+  const entries = Object.entries(participantContributions);
+  const participantRefunds: Record<string, number> = {};
+
+  if (entries.length > 0) {
+    const totalPaid = entries.reduce((sum, [, amount]) => sum + (typeof amount === 'number' && amount > 0 ? amount : 0), 0);
+    const divisor = totalPaid > 0 ? totalPaid : cost;
+
+    for (const [name, amount] of entries) {
+      const paid = typeof amount === 'number' && amount > 0 ? amount : 0;
+      participantRefunds[name] = Math.round((netRefundPoolUsd * (paid / divisor)) * 100) / 100;
+    }
+  }
+
+  return {
+    valid: true,
+    totalBookingCostUsd: cost,
+    grossRefundAmountUsd: gross,
+    netRefundPoolUsd,
+    cancellationFeeUsd: fee,
+    participantRefunds,
+    refundPercentage,
+    recommendation: `Net cancellation refund pool is $${netRefundPoolUsd.toFixed(2)} (${refundPercentage}% of original booking cost).`
+  };
+}
+
+
 
 
 
