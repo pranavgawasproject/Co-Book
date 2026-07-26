@@ -41,8 +41,10 @@ import {
   calculateGroupTripEmergencyContingencyReserve,
   calculateGroupTripCarbonAndBudgetEfficiency,
   calculateGroupTripBudgetForecastAndOptimization,
-  calculateGroupTripCancellationRefundDistribution
+  calculateGroupTripCancellationRefundDistribution,
+  calculateGroupTripExpenseShareWithTieredRatios
 } from '../splitMath';
+
 
 
 
@@ -871,7 +873,31 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.recommendation).toBe('Total booking cost must be greater than 0.');
     });
   });
+
+  describe('calculateGroupTripExpenseShareWithTieredRatios', () => {
+    test('splits total expense proportionally according to tiered weights', () => {
+      const res = calculateGroupTripExpenseShareWithTieredRatios({
+        totalExpenseUsd: 500,
+        tieredShares: [
+          { name: 'Alice', weight: 1.0 },
+          { name: 'Bob', weight: 1.0 }
+        ]
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalExpenseUsd).toBe(500);
+      expect(res.totalWeights).toBe(2.0);
+      expect(res.individualShares.Alice).toBe(250);
+      expect(res.individualShares.Bob).toBe(250);
+    });
+
+    test('returns invalid state for zero total expense', () => {
+      const res = calculateGroupTripExpenseShareWithTieredRatios({ totalExpenseUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toBe('Valid total expense and non-empty tiered shares array required.');
+    });
+  });
 });
+
 
 
 

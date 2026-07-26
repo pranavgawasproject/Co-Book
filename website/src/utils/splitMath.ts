@@ -1867,6 +1867,53 @@ export function calculateGroupTripCancellationRefundDistribution({
   };
 }
 
+export function calculateGroupTripExpenseShareWithTieredRatios({
+  totalExpenseUsd = 600,
+  tieredShares = [
+    { name: 'Alice', weight: 1.0 },
+    { name: 'Bob', weight: 1.0 },
+    { name: 'Charlie', weight: 0.5 }
+  ]
+}: {
+  totalExpenseUsd?: number;
+  tieredShares?: Array<{ name: string; weight?: number }>;
+} = {}): {
+  valid: boolean;
+  totalExpenseUsd: number;
+  totalWeights: number;
+  individualShares: Record<string, number>;
+  recommendation: string;
+} {
+  const expense = typeof totalExpenseUsd === 'number' && totalExpenseUsd > 0 ? totalExpenseUsd : 0;
+  if (expense === 0 || !Array.isArray(tieredShares) || tieredShares.length === 0) {
+    return {
+      valid: false,
+      totalExpenseUsd: 0,
+      totalWeights: 0,
+      individualShares: {},
+      recommendation: 'Valid total expense and non-empty tiered shares array required.'
+    };
+  }
+
+  const totalWeights = tieredShares.reduce((sum, item) => sum + (typeof item.weight === 'number' && item.weight > 0 ? item.weight : 1.0), 0);
+  const individualShares: Record<string, number> = {};
+
+  for (const item of tieredShares) {
+    const name = item.name || 'Member';
+    const weight = typeof item.weight === 'number' && item.weight > 0 ? item.weight : 1.0;
+    individualShares[name] = Math.round((expense * (weight / totalWeights)) * 100) / 100;
+  }
+
+  return {
+    valid: true,
+    totalExpenseUsd: expense,
+    totalWeights,
+    individualShares,
+    recommendation: `Expense of $${expense.toFixed(2)} split proportionally across ${tieredShares.length} participants with total weight ${totalWeights}.`
+  };
+}
+
+
 
 
 
