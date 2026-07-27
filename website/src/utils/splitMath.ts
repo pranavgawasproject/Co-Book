@@ -2039,3 +2039,75 @@ export function calculateGroupFlightAndHotelBundleSplit({
   };
 }
 
+export function calculateGroupTripExpenseSettleUpPlan(
+  participants: Array<{ name: string; totalPaidUsd: number; targetShareUsd?: number }>
+): {
+  valid: boolean;
+  totalTripExpenseUsd: number;
+  minimalTransactions: Array<{ from: string; to: string; amountUsd: number }>;
+  transactionCount: number;
+  isBalanced: boolean;
+  error?: string;
+  recommendation: string;
+} {
+  if (!Array.isArray(participants) || participants.length === 0) {
+    return {
+      valid: false,
+      totalTripExpenseUsd: 0,
+      minimalTransactions: [],
+      transactionCount: 0,
+      isBalanced: false,
+      error: 'Participants array must be non-empty.',
+      recommendation: 'Valid non-empty participants array required.'
+    };
+  }
+
+  const totalTripExpenseUsd = participants.reduce((sum, p) => sum + (typeof p.totalPaidUsd === 'number' && p.totalPaidUsd > 0 ? p.totalPaidUsd : 0), 0);
+  const equalShare = totalTripExpenseUsd / participants.length;
+
+  const netBalances = participants.map(p => {
+    const paid = typeof p.totalPaidUsd === 'number' && p.totalPaidUsd > 0 ? p.totalPaidUsd : 0;
+    const target = typeof p.targetShareUsd === 'number' && p.targetShareUsd >= 0 ? p.targetShareUsd : equalShare;
+    return {
+      name: p.name || 'Member',
+      net: paid - target
+    };
+  });
+
+  const debtors = netBalances.filter(b => b.net < -0.01).map(b => ({ name: b.name, amount: -b.net }));
+  const creditors = netBalances.filter(b => b.net > 0.01).map(b => ({ name: b.name, amount: b.net }));
+
+  const minimalTransactions: Array<{ from: string; to: string; amountUsd: number }> = [];
+
+  let i = 0;
+  let j = 0;
+  while (i < debtors.length && j < creditors.length) {
+    const payment = Math.min(debtors[i].amount, creditors[j].amount);
+    if (payment > 0.01) {
+      minimalTransactions.push({
+        from: debtors[i].name,
+        to: creditors[j].name,
+        amountUsd: Math.round(payment * 100) / 100
+      });
+    }
+
+    debtors[i].amount -= payment;
+    creditors[j].amount -= payment;
+
+    if (debtors[i].amount <= 0.01) i++;
+    if (creditors[j].amount <= 0.01) j++;
+  }
+
+  return {
+    valid: true,
+    totalTripExpenseUsd: Math.round(totalTripExpenseUsd * 100) / 100,
+    minimalTransactions,
+    transactionCount: minimalTransactions.length,
+    isBalanced: true,
+    recommendation: minimalTransactions.length === 0
+      ? 'All group balances are settled up perfectly.'
+      : `Group expenses totaling $${totalTripExpenseUsd.toFixed(2)} settled via ${minimalTransactions.length} minimal transactions.`
+  };
+}
+
+

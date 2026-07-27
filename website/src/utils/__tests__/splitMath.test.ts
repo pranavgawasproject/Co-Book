@@ -44,7 +44,8 @@ import {
   calculateGroupTripCancellationRefundDistribution,
   calculateGroupTripExpenseShareWithTieredRatios,
   calculateGroupTripSharedAccommodationSplit,
-  calculateGroupFlightAndHotelBundleSplit
+  calculateGroupFlightAndHotelBundleSplit,
+  calculateGroupTripExpenseSettleUpPlan
 } from '../splitMath';
 
 
@@ -950,7 +951,31 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.recommendation).toBe('Valid bundle cost and non-empty members array required.');
     });
   });
+
+  describe('calculateGroupTripExpenseSettleUpPlan', () => {
+    test('calculates minimal transactions for unbalanced group expenses', () => {
+      const participants = [
+        { name: 'Alice', totalPaidUsd: 300 },
+        { name: 'Bob', totalPaidUsd: 0 },
+        { name: 'Charlie', totalPaidUsd: 0 }
+      ];
+      const res = calculateGroupTripExpenseSettleUpPlan(participants);
+      expect(res.valid).toBe(true);
+      expect(res.totalTripExpenseUsd).toBe(300);
+      expect(res.transactionCount).toBe(2);
+      expect(res.minimalTransactions[0]).toEqual({ from: 'Bob', to: 'Alice', amountUsd: 100 });
+      expect(res.minimalTransactions[1]).toEqual({ from: 'Charlie', to: 'Alice', amountUsd: 100 });
+      expect(res.isBalanced).toBe(true);
+    });
+
+    test('returns invalid state for empty participants array', () => {
+      const res = calculateGroupTripExpenseSettleUpPlan([]);
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Participants array must be non-empty.');
+    });
+  });
 });
+
 
 
 
