@@ -42,7 +42,8 @@ import {
   calculateGroupTripCarbonAndBudgetEfficiency,
   calculateGroupTripBudgetForecastAndOptimization,
   calculateGroupTripCancellationRefundDistribution,
-  calculateGroupTripExpenseShareWithTieredRatios
+  calculateGroupTripExpenseShareWithTieredRatios,
+  calculateGroupTripSharedAccommodationSplit
 } from '../splitMath';
 
 
@@ -894,6 +895,29 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTripExpenseShareWithTieredRatios({ totalExpenseUsd: 0 });
       expect(res.valid).toBe(false);
       expect(res.recommendation).toBe('Valid total expense and non-empty tiered shares array required.');
+    });
+  });
+
+  describe('calculateGroupTripSharedAccommodationSplit', () => {
+    test('calculates lodging split weighted by room tier and nights stayed', () => {
+      const roomTiers = [
+        { name: 'Alice', roomTier: 'Master Suite', nightsStayed: 4, tierMultiplier: 1.5 },
+        { name: 'Bob', roomTier: 'Standard Room', nightsStayed: 4, tierMultiplier: 1.0 },
+        { name: 'Charlie', roomTier: 'Standard Room', nightsStayed: 2, tierMultiplier: 1.0 }
+      ];
+      const res = calculateGroupTripSharedAccommodationSplit({ totalLodgingCostUsd: 1200, roomTiers });
+      expect(res.valid).toBe(true);
+      expect(res.totalLodgingCostUsd).toBe(1200);
+      expect(res.perPersonShareMap.Alice).toBe(600);
+      expect(res.perPersonShareMap.Bob).toBe(400);
+      expect(res.perPersonShareMap.Charlie).toBe(200);
+      expect(res.recommendation).toContain('Total lodging cost $1200.00 split');
+    });
+
+    test('returns invalid for zero lodging cost or empty roomTiers', () => {
+      const res = calculateGroupTripSharedAccommodationSplit({ totalLodgingCostUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toBe('Valid total lodging cost and room tiers array required.');
     });
   });
 });

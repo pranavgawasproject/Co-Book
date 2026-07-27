@@ -1913,10 +1913,52 @@ export function calculateGroupTripExpenseShareWithTieredRatios({
   };
 }
 
+export function calculateGroupTripSharedAccommodationSplit({
+  totalLodgingCostUsd = 1200,
+  roomTiers = [
+    { name: 'Alice', roomTier: 'Master Suite', nightsStayed: 4, tierMultiplier: 1.5 },
+    { name: 'Bob', roomTier: 'Standard Room', nightsStayed: 4, tierMultiplier: 1.0 },
+    { name: 'Charlie', roomTier: 'Standard Room', nightsStayed: 2, tierMultiplier: 1.0 }
+  ]
+}: {
+  totalLodgingCostUsd?: number;
+  roomTiers?: Array<{ name: string; roomTier?: string; nightsStayed?: number; tierMultiplier?: number }>;
+} = {}): {
+  valid: boolean;
+  totalLodgingCostUsd: number;
+  perPersonShareMap: Record<string, number>;
+  recommendation: string;
+} {
+  const cost = typeof totalLodgingCostUsd === 'number' && totalLodgingCostUsd > 0 ? totalLodgingCostUsd : 0;
+  if (cost === 0 || !Array.isArray(roomTiers) || roomTiers.length === 0) {
+    return {
+      valid: false,
+      totalLodgingCostUsd: 0,
+      perPersonShareMap: {},
+      recommendation: 'Valid total lodging cost and room tiers array required.'
+    };
+  }
 
+  let totalWeightedNights = 0;
+  for (const item of roomTiers) {
+    const nights = typeof item.nightsStayed === 'number' && item.nightsStayed > 0 ? item.nightsStayed : 1;
+    const mult = typeof item.tierMultiplier === 'number' && item.tierMultiplier > 0 ? item.tierMultiplier : 1.0;
+    totalWeightedNights += nights * mult;
+  }
 
+  const perPersonShareMap: Record<string, number> = {};
+  for (const item of roomTiers) {
+    const name = item.name || 'Member';
+    const nights = typeof item.nightsStayed === 'number' && item.nightsStayed > 0 ? item.nightsStayed : 1;
+    const mult = typeof item.tierMultiplier === 'number' && item.tierMultiplier > 0 ? item.tierMultiplier : 1.0;
+    const itemWeightedNights = nights * mult;
+    perPersonShareMap[name] = Math.round((cost * (itemWeightedNights / totalWeightedNights)) * 100) / 100;
+  }
 
-
-
-
-
+  return {
+    valid: true,
+    totalLodgingCostUsd: cost,
+    perPersonShareMap,
+    recommendation: `Total lodging cost $${cost.toFixed(2)} split across ${roomTiers.length} guests weighted by room tier and nights stayed.`
+  };
+}
