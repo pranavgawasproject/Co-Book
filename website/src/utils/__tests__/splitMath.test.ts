@@ -43,8 +43,10 @@ import {
   calculateGroupTripBudgetForecastAndOptimization,
   calculateGroupTripCancellationRefundDistribution,
   calculateGroupTripExpenseShareWithTieredRatios,
-  calculateGroupTripSharedAccommodationSplit
+  calculateGroupTripSharedAccommodationSplit,
+  calculateGroupFlightAndHotelBundleSplit
 } from '../splitMath';
+
 
 
 
@@ -920,7 +922,36 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.recommendation).toBe('Valid total lodging cost and room tiers array required.');
     });
   });
+
+  describe('calculateGroupFlightAndHotelBundleSplit', () => {
+    test('calculates flight + hotel bundle cost breakdown and deposit required per member accurately', () => {
+      const members = [
+        { name: 'Alice', flightCostUsd: 400, hotelShareUsd: 500, seatUpgradeUsd: 100 },
+        { name: 'Bob', flightCostUsd: 400, hotelShareUsd: 500, seatUpgradeUsd: 0 }
+      ];
+      const res = calculateGroupFlightAndHotelBundleSplit({
+        bundleTotalCostUsd: 1900,
+        packageDiscountUsd: 200,
+        members,
+        depositPercentage: 20
+      });
+      expect(res.valid).toBe(true);
+      expect(res.netPackageCostUsd).toBe(1700);
+      expect(res.memberBreakdown.Alice.baseUsd).toBe(1000);
+      expect(res.memberBreakdown.Alice.discountUsd).toBe(105.26);
+      expect(res.memberBreakdown.Alice.netTotalUsd).toBe(894.74);
+      expect(res.memberBreakdown.Alice.depositRequiredUsd).toBe(178.95);
+      expect(res.recommendation).toContain('Bundle package cost of $1700.00 split across 2 members');
+    });
+
+    test('returns invalid state for zero bundle total cost', () => {
+      const res = calculateGroupFlightAndHotelBundleSplit({ bundleTotalCostUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.recommendation).toBe('Valid bundle cost and non-empty members array required.');
+    });
+  });
 });
+
 
 
 

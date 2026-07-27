@@ -1962,3 +1962,80 @@ export function calculateGroupTripSharedAccommodationSplit({
     recommendation: `Total lodging cost $${cost.toFixed(2)} split across ${roomTiers.length} guests weighted by room tier and nights stayed.`
   };
 }
+
+export function calculateGroupFlightAndHotelBundleSplit({
+  bundleTotalCostUsd = 2000,
+  packageDiscountUsd = 200,
+  members = [
+    { name: 'Alice', flightCostUsd: 400, hotelShareUsd: 500, seatUpgradeUsd: 50 },
+    { name: 'Bob', flightCostUsd: 400, hotelShareUsd: 500, seatUpgradeUsd: 0 }
+  ],
+  depositPercentage = 20
+}: {
+  bundleTotalCostUsd?: number;
+  packageDiscountUsd?: number;
+  members?: Array<{ name: string; flightCostUsd?: number; hotelShareUsd?: number; seatUpgradeUsd?: number }>;
+  depositPercentage?: number;
+} = {}): {
+  valid: boolean;
+  bundleTotalCostUsd: number;
+  packageDiscountUsd: number;
+  netPackageCostUsd: number;
+  depositPercentage: number;
+  memberBreakdown: Record<string, { baseUsd: number; discountUsd: number; netTotalUsd: number; depositRequiredUsd: number }>;
+  recommendation: string;
+} {
+  const cost = typeof bundleTotalCostUsd === 'number' && bundleTotalCostUsd > 0 ? bundleTotalCostUsd : 0;
+  const discount = typeof packageDiscountUsd === 'number' && packageDiscountUsd >= 0 ? packageDiscountUsd : 0;
+  const depositPct = typeof depositPercentage === 'number' && depositPercentage >= 0 ? depositPercentage : 20;
+
+  if (cost === 0 || !Array.isArray(members) || members.length === 0) {
+    return {
+      valid: false,
+      bundleTotalCostUsd: 0,
+      packageDiscountUsd: 0,
+      netPackageCostUsd: 0,
+      depositPercentage: depositPct,
+      memberBreakdown: {},
+      recommendation: 'Valid bundle cost and non-empty members array required.'
+    };
+  }
+
+  let totalIndividualBaseCost = 0;
+  const rawMemberMap = members.map(m => {
+    const flight = typeof m.flightCostUsd === 'number' && m.flightCostUsd > 0 ? m.flightCostUsd : 0;
+    const hotel = typeof m.hotelShareUsd === 'number' && m.hotelShareUsd > 0 ? m.hotelShareUsd : 0;
+    const upgrade = typeof m.seatUpgradeUsd === 'number' && m.seatUpgradeUsd > 0 ? m.seatUpgradeUsd : 0;
+    const baseUsd = flight + hotel + upgrade;
+    totalIndividualBaseCost += baseUsd;
+    return { name: m.name || 'Member', baseUsd };
+  });
+
+  const netPackageCostUsd = Math.max(0, Math.round((cost - discount) * 100) / 100);
+  const memberBreakdown: Record<string, { baseUsd: number; discountUsd: number; netTotalUsd: number; depositRequiredUsd: number }> = {};
+
+  rawMemberMap.forEach(m => {
+    const ratio = totalIndividualBaseCost > 0 ? m.baseUsd / totalIndividualBaseCost : 1 / members.length;
+    const memberDiscount = Math.round(discount * ratio * 100) / 100;
+    const netTotalUsd = Math.round((m.baseUsd - memberDiscount) * 100) / 100;
+    const depositRequiredUsd = Math.round((netTotalUsd * (depositPct / 100)) * 100) / 100;
+
+    memberBreakdown[m.name] = {
+      baseUsd: m.baseUsd,
+      discountUsd: memberDiscount,
+      netTotalUsd,
+      depositRequiredUsd
+    };
+  });
+
+  return {
+    valid: true,
+    bundleTotalCostUsd: cost,
+    packageDiscountUsd: discount,
+    netPackageCostUsd,
+    depositPercentage: depositPct,
+    memberBreakdown,
+    recommendation: `Bundle package cost of $${netPackageCostUsd.toFixed(2)} split across ${members.length} members (${depositPct}% deposit required at booking).`
+  };
+}
+
