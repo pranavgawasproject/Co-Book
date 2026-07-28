@@ -45,7 +45,8 @@ import {
   calculateGroupTripExpenseShareWithTieredRatios,
   calculateGroupTripSharedAccommodationSplit,
   calculateGroupFlightAndHotelBundleSplit,
-  calculateGroupTripExpenseSettleUpPlan
+  calculateGroupTripExpenseSettleUpPlan,
+  calculateGroupTripExpenseReconciliationAudit
 } from '../splitMath';
 
 
@@ -974,7 +975,28 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.error).toBe('Participants array must be non-empty.');
     });
   });
+
+  describe('calculateGroupTripExpenseReconciliationAudit', () => {
+    test('calculates reconciled and settlement ready status for verified expenses', () => {
+      const expenses = [
+        { id: '1', payerName: 'Alice', amountUsd: 120, hasReceipt: true, isConfirmed: true },
+        { id: '2', payerName: 'Bob', amountUsd: 80, hasReceipt: true, isConfirmed: true }
+      ];
+      const res = calculateGroupTripExpenseReconciliationAudit({ expenses, totalMembersCount: 4 });
+      expect(res.valid).toBe(true);
+      expect(res.reconciliationTier).toBe('RECONCILED_AND_SETTLEMENT_READY');
+      expect(res.reconciliationScore).toBe(100);
+      expect(res.perPersonShareUsd).toBe(50);
+    });
+
+    test('returns error for invalid members count', () => {
+      const res = calculateGroupTripExpenseReconciliationAudit({ totalMembersCount: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Total members count must be a positive number');
+    });
+  });
 });
+
 
 
 

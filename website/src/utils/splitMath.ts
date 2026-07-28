@@ -2110,4 +2110,80 @@ export function calculateGroupTripExpenseSettleUpPlan(
   };
 }
 
+export interface GroupExpenseItem {
+  id?: string;
+  payerName?: string;
+  amountUsd?: number;
+  hasReceipt?: boolean;
+  isConfirmed?: boolean;
+}
+
+export function calculateGroupTripExpenseReconciliationAudit({
+  expenses = [],
+  totalMembersCount = 4,
+  requiredReceiptThresholdUsd = 50
+}: {
+  expenses?: GroupExpenseItem[];
+  totalMembersCount?: number;
+  requiredReceiptThresholdUsd?: number;
+} = {}) {
+  if (!Array.isArray(expenses)) {
+    return { valid: false, error: 'Expenses must be an array' };
+  }
+  if (typeof totalMembersCount !== 'number' || totalMembersCount <= 0) {
+    return { valid: false, error: 'Total members count must be a positive number' };
+  }
+
+  let totalTripExpenseUsd = 0;
+  let unverifiedExpenseUsd = 0;
+  let missingReceiptsCount = 0;
+  let confirmedExpensesCount = 0;
+
+  for (const exp of expenses) {
+    if (!exp || typeof exp.amountUsd !== 'number' || exp.amountUsd <= 0) continue;
+    totalTripExpenseUsd += exp.amountUsd;
+
+    if (!exp.hasReceipt && exp.amountUsd >= requiredReceiptThresholdUsd) {
+      missingReceiptsCount++;
+      unverifiedExpenseUsd += exp.amountUsd;
+    }
+
+    if (exp.isConfirmed) {
+      confirmedExpensesCount++;
+    }
+  }
+
+  totalTripExpenseUsd = Math.round(totalTripExpenseUsd * 100) / 100;
+  unverifiedExpenseUsd = Math.round(unverifiedExpenseUsd * 100) / 100;
+  const verifiedExpenseUsd = Math.round((totalTripExpenseUsd - unverifiedExpenseUsd) * 100) / 100;
+
+  const perPersonShareUsd = Math.round((totalTripExpenseUsd / totalMembersCount) * 100) / 100;
+  const verificationRatio = expenses.length > 0 ? (expenses.length - missingReceiptsCount) / expenses.length : 1;
+  const confirmationRatio = expenses.length > 0 ? confirmedExpensesCount / expenses.length : 1;
+
+  const reconciliationScore = Math.min(100, Math.max(0, Math.round(verificationRatio * 50 + confirmationRatio * 50)));
+
+  let reconciliationTier = 'RECONCILED_AND_SETTLEMENT_READY';
+  if (reconciliationScore < 60) reconciliationTier = 'UNBALANCED_MISSING_DOCUMENTATION';
+  else if (reconciliationScore < 85) reconciliationTier = 'PENDING_FINAL_CONFIRMATION';
+
+  return {
+    valid: true,
+    totalExpensesCount: expenses.length,
+    totalTripExpenseUsd,
+    verifiedExpenseUsd,
+    unverifiedExpenseUsd,
+    missingReceiptsCount,
+    perPersonShareUsd,
+    reconciliationScore,
+    reconciliationTier,
+    recommendation: reconciliationTier === 'RECONCILED_AND_SETTLEMENT_READY'
+      ? `All trip expenses reconciled (${reconciliationScore}/100 score). Per-person share: $${perPersonShareUsd.toFixed(2)}. Ready for 1-click group settlement.`
+      : reconciliationTier === 'UNBALANCED_MISSING_DOCUMENTATION'
+      ? `Reconciliation score (${reconciliationScore}/100). ${missingReceiptsCount} expenses missing receipt documentation (>$${requiredReceiptThresholdUsd}).`
+      : `Pending final member confirmation (${reconciliationScore}/100 score). $${verifiedExpenseUsd.toFixed(2)} verified.`
+  };
+}
+
+
 
