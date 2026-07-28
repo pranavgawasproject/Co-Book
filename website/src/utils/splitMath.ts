@@ -2185,5 +2185,82 @@ export function calculateGroupTripExpenseReconciliationAudit({
   };
 }
 
+export interface CategoryBudgetMap {
+  [category: string]: { targetUsd: number; actualUsd: number };
+}
+
+export function calculateGroupTripBudgetVarianceAudit({
+  categoryBudgets = {},
+  totalMembersCount = 4
+}: {
+  categoryBudgets?: CategoryBudgetMap;
+  totalMembersCount?: number;
+} = {}) {
+  if (typeof categoryBudgets !== 'object' || categoryBudgets === null) {
+    return { valid: false, error: 'Category budgets must be a valid object' };
+  }
+  if (typeof totalMembersCount !== 'number' || totalMembersCount <= 0) {
+    return { valid: false, error: 'Total members count must be a positive number' };
+  }
+
+  let totalTargetUsd = 0;
+  let totalActualUsd = 0;
+  const overBudgetCategories: Array<{ category: string; targetUsd: number; actualUsd: number; overageUsd: number }> = [];
+
+  for (const [cat, data] of Object.entries(categoryBudgets)) {
+    if (!data) continue;
+    const target = typeof data.targetUsd === 'number' && data.targetUsd >= 0 ? data.targetUsd : 0;
+    const actual = typeof data.actualUsd === 'number' && data.actualUsd >= 0 ? data.actualUsd : 0;
+
+    totalTargetUsd += target;
+    totalActualUsd += actual;
+
+    if (actual > target) {
+      overBudgetCategories.push({
+        category: cat,
+        targetUsd: target,
+        actualUsd: actual,
+        overageUsd: Math.round((actual - target) * 100) / 100
+      });
+    }
+  }
+
+  totalTargetUsd = Math.round(totalTargetUsd * 100) / 100;
+  totalActualUsd = Math.round(totalActualUsd * 100) / 100;
+
+  if (totalTargetUsd === 0 && totalActualUsd === 0) {
+    return { valid: false, error: 'No budget data provided to analyze' };
+  }
+
+  const netVarianceUsd = Math.round((totalActualUsd - totalTargetUsd) * 100) / 100;
+  const variancePercentage = totalTargetUsd > 0 ? Math.round((netVarianceUsd / totalTargetUsd) * 100 * 100) / 100 : 0;
+
+  const perPersonTargetUsd = Math.round((totalTargetUsd / totalMembersCount) * 100) / 100;
+  const perPersonActualUsd = Math.round((totalActualUsd / totalMembersCount) * 100) / 100;
+
+  let budgetStatusTier = 'UNDER_BUDGET';
+  if (variancePercentage > 15) budgetStatusTier = 'SIGNIFICANT_OVERRUN';
+  else if (variancePercentage > 0) budgetStatusTier = 'SLIGHT_OVERRUN';
+
+  return {
+    valid: true,
+    totalTargetUsd,
+    totalActualUsd,
+    netVarianceUsd,
+    variancePercentage,
+    perPersonTargetUsd,
+    perPersonActualUsd,
+    overBudgetCategoriesCount: overBudgetCategories.length,
+    overBudgetCategories,
+    budgetStatusTier,
+    recommendation: budgetStatusTier === 'UNDER_BUDGET'
+      ? `Group trip spend ($${totalActualUsd.toFixed(2)}) is within target budget ($${totalTargetUsd.toFixed(2)}). Surplus: $${Math.abs(netVarianceUsd).toFixed(2)}.`
+      : budgetStatusTier === 'SLIGHT_OVERRUN'
+      ? `Minor budget overrun of ${variancePercentage}% ($${netVarianceUsd.toFixed(2)}). Over-budget in ${overBudgetCategories.length} category.`
+      : `SIGNIFICANT BUDGET OVERRUN (+${variancePercentage}%, +$${netVarianceUsd.toFixed(2)}). Review ${overBudgetCategories.length} over-budget category allocations.`
+  };
+}
+
+
 
 

@@ -46,7 +46,8 @@ import {
   calculateGroupTripSharedAccommodationSplit,
   calculateGroupFlightAndHotelBundleSplit,
   calculateGroupTripExpenseSettleUpPlan,
-  calculateGroupTripExpenseReconciliationAudit
+  calculateGroupTripExpenseReconciliationAudit,
+  calculateGroupTripBudgetVarianceAudit
 } from '../splitMath';
 
 
@@ -995,7 +996,46 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.error).toBe('Total members count must be a positive number');
     });
   });
+
+  describe('calculateGroupTripBudgetVarianceAudit', () => {
+    test('calculates budget variance and over-budget categories correctly', () => {
+      const categoryBudgets = {
+        lodging: { targetUsd: 1000, actualUsd: 1200 },
+        flights: { targetUsd: 800, actualUsd: 750 },
+        dining: { targetUsd: 400, actualUsd: 500 }
+      };
+      const res = calculateGroupTripBudgetVarianceAudit({ categoryBudgets, totalMembersCount: 4 });
+      expect(res.valid).toBe(true);
+      expect(res.totalTargetUsd).toBe(2200);
+      expect(res.totalActualUsd).toBe(2450);
+      expect(res.netVarianceUsd).toBe(250);
+      expect(res.variancePercentage).toBe(11.36);
+      expect(res.perPersonTargetUsd).toBe(550);
+      expect(res.perPersonActualUsd).toBe(612.5);
+      expect(res.overBudgetCategoriesCount).toBe(2);
+      expect(res.budgetStatusTier).toBe('SLIGHT_OVERRUN');
+      expect(res.recommendation).toContain('Minor budget overrun of 11.36%');
+    });
+
+    test('returns under budget status when actual spend is within target', () => {
+      const categoryBudgets = {
+        activities: { targetUsd: 500, actualUsd: 400 }
+      };
+      const res = calculateGroupTripBudgetVarianceAudit({ categoryBudgets });
+      expect(res.valid).toBe(true);
+      expect(res.budgetStatusTier).toBe('UNDER_BUDGET');
+      expect(res.netVarianceUsd).toBe(-100);
+      expect(res.recommendation).toContain('Surplus: $100.00');
+    });
+
+    test('returns error for invalid input', () => {
+      const res = calculateGroupTripBudgetVarianceAudit({ totalMembersCount: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Total members count must be a positive number');
+    });
+  });
 });
+
 
 
 
