@@ -47,7 +47,8 @@ import {
   calculateGroupFlightAndHotelBundleSplit,
   calculateGroupTripExpenseSettleUpPlan,
   calculateGroupTripExpenseReconciliationAudit,
-  calculateGroupTripBudgetVarianceAudit
+  calculateGroupTripBudgetVarianceAudit,
+  calculateGroupTripDynamicStayProRataSplit
 } from '../splitMath';
 
 
@@ -1034,7 +1035,43 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.error).toBe('Total members count must be a positive number');
     });
   });
+
+  describe('calculateGroupTripDynamicStayProRataSplit', () => {
+    test('calculates pro-rata cost breakdown based on member stay duration correctly', () => {
+      const memberStays = [
+        { name: 'Alice', nightsAttended: 5 },
+        { name: 'Bob', nightsAttended: 3 },
+        { name: 'Charlie', nightsAttended: 2 }
+      ];
+      const res = calculateGroupTripDynamicStayProRataSplit(1000, 5, memberStays);
+
+      expect(res.valid).toBe(true);
+      expect(res.totalCostUsd).toBe(1000);
+      expect(res.totalTripNights).toBe(5);
+      expect(res.totalMemberNights).toBe(10);
+      expect(res.costPerMemberNightUsd).toBe(100);
+      expect(res.equalSplitPerPersonUsd).toBe(333.33);
+      expect(res.memberBreakdown).toHaveLength(3);
+      expect(res.memberBreakdown![0].name).toBe('Alice');
+      expect(res.memberBreakdown![0].proRataShareUsd).toBe(500);
+      expect(res.memberBreakdown![1].name).toBe('Bob');
+      expect(res.memberBreakdown![1].proRataShareUsd).toBe(300);
+      expect(res.memberBreakdown![2].name).toBe('Charlie');
+      expect(res.memberBreakdown![2].proRataShareUsd).toBe(200);
+    });
+
+    test('returns error for non-positive total cost or empty member stays', () => {
+      const invalidCost = calculateGroupTripDynamicStayProRataSplit(0, 5, [{ name: 'Alice', nightsAttended: 3 }]);
+      expect(invalidCost.valid).toBe(false);
+      expect(invalidCost.error).toBe('Total cost must be a positive number');
+
+      const invalidMembers = calculateGroupTripDynamicStayProRataSplit(1000, 5, []);
+      expect(invalidMembers.valid).toBe(false);
+      expect(invalidMembers.error).toBe('Member stays array cannot be empty');
+    });
+  });
 });
+
 
 
 

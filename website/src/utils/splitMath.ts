@@ -2261,6 +2261,77 @@ export function calculateGroupTripBudgetVarianceAudit({
   };
 }
 
+export function calculateGroupTripDynamicStayProRataSplit(
+  totalCostUsd: number,
+  totalTripNights: number,
+  memberStays: Array<{ name: string; nightsAttended: number }>
+): {
+  valid: boolean;
+  error?: string;
+  totalCostUsd?: number;
+  totalTripNights?: number;
+  totalMemberNights?: number;
+  costPerMemberNightUsd?: number;
+  equalSplitPerPersonUsd?: number;
+  memberBreakdown?: Array<{
+    name: string;
+    nightsAttended: number;
+    proRataShareUsd: number;
+    varianceVsEqualSplitUsd: number;
+  }>;
+} {
+  if (typeof totalCostUsd !== 'number' || totalCostUsd <= 0) {
+    return { valid: false, error: 'Total cost must be a positive number' };
+  }
+  if (typeof totalTripNights !== 'number' || totalTripNights <= 0) {
+    return { valid: false, error: 'Total trip nights must be a positive number' };
+  }
+  if (!Array.isArray(memberStays) || memberStays.length === 0) {
+    return { valid: false, error: 'Member stays array cannot be empty' };
+  }
+
+  let totalMemberNights = 0;
+  const validStays: Array<{ name: string; nightsAttended: number }> = [];
+
+  for (const m of memberStays) {
+    if (!m || !m.name) continue;
+    const nights = typeof m.nightsAttended === 'number' && m.nightsAttended > 0 ? Math.min(totalTripNights, m.nightsAttended) : 0;
+    if (nights > 0) {
+      totalMemberNights += nights;
+      validStays.push({ name: m.name.trim(), nightsAttended: nights });
+    }
+  }
+
+  if (validStays.length === 0 || totalMemberNights === 0) {
+    return { valid: false, error: 'No valid member stay nights found' };
+  }
+
+  const costPerMemberNightUsd = Math.round((totalCostUsd / totalMemberNights) * 100) / 100;
+  const equalSplitPerPersonUsd = Math.round((totalCostUsd / validStays.length) * 100) / 100;
+
+  const memberBreakdown = validStays.map(m => {
+    const proRataShareUsd = Math.round(costPerMemberNightUsd * m.nightsAttended * 100) / 100;
+    const varianceVsEqualSplitUsd = Math.round((proRataShareUsd - equalSplitPerPersonUsd) * 100) / 100;
+    return {
+      name: m.name,
+      nightsAttended: m.nightsAttended,
+      proRataShareUsd,
+      varianceVsEqualSplitUsd
+    };
+  });
+
+  return {
+    valid: true,
+    totalCostUsd: Math.round(totalCostUsd * 100) / 100,
+    totalTripNights,
+    totalMemberNights,
+    costPerMemberNightUsd,
+    equalSplitPerPersonUsd,
+    memberBreakdown
+  };
+}
+
+
 
 
 
