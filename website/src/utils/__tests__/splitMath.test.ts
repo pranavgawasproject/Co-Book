@@ -48,7 +48,8 @@ import {
   calculateGroupTripExpenseSettleUpPlan,
   calculateGroupTripExpenseReconciliationAudit,
   calculateGroupTripBudgetVarianceAudit,
-  calculateGroupTripDynamicStayProRataSplit
+  calculateGroupTripDynamicStayProRataSplit,
+  calculateGroupTripFlightBaggageShareSplit
 } from '../splitMath';
 
 
@@ -1070,7 +1071,38 @@ describe('Co-Book Split Math Utility', () => {
       expect(invalidMembers.error).toBe('Member stays array cannot be empty');
     });
   });
+
+  describe('calculateGroupTripFlightBaggageShareSplit', () => {
+    test('calculates per person baggage fee breakdown accurately with overweight weighting', () => {
+      const checkedBagsList = [
+        { name: 'Alice', checkedBagsCount: 2, isOverweight: true },
+        { name: 'Bob', checkedBagsCount: 1, isOverweight: false }
+      ];
+      const res = calculateGroupTripFlightBaggageShareSplit(160, checkedBagsList);
+
+      expect(res.valid).toBe(true);
+      expect(res.totalBaggageFeesUsd).toBe(160);
+      expect(res.totalCheckedBagsCount).toBe(3);
+      expect(res.perBagCostUsd).toBe(53.33);
+      expect(res.memberBaggageBreakdown).toHaveLength(2);
+      expect(res.memberBaggageBreakdown![0].name).toBe('Alice');
+      expect(res.memberBaggageBreakdown![0].allocatedFeeUsd).toBe(120); // 3 weight factor / 4 total weight * 160
+      expect(res.memberBaggageBreakdown![1].name).toBe('Bob');
+      expect(res.memberBaggageBreakdown![1].allocatedFeeUsd).toBe(40); // 1 weight factor / 4 total weight * 160
+    });
+
+    test('returns error for non-positive total baggage fees or empty list', () => {
+      const invalidFee = calculateGroupTripFlightBaggageShareSplit(0, [{ name: 'Alice', checkedBagsCount: 1 }]);
+      expect(invalidFee.valid).toBe(false);
+      expect(invalidFee.error).toBe('Total baggage fees must be a positive number');
+
+      const invalidList = calculateGroupTripFlightBaggageShareSplit(100, []);
+      expect(invalidList.valid).toBe(false);
+      expect(invalidList.error).toBe('Checked bags list cannot be empty');
+    });
+  });
 });
+
 
 
 

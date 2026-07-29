@@ -2331,6 +2331,76 @@ export function calculateGroupTripDynamicStayProRataSplit(
   };
 }
 
+export function calculateGroupTripFlightBaggageShareSplit(
+  totalBaggageFeesUsd: number,
+  checkedBagsList: Array<{ name: string; checkedBagsCount: number; isOverweight?: boolean }>
+): {
+  valid: boolean;
+  error?: string;
+  totalBaggageFeesUsd?: number;
+  totalCheckedBagsCount?: number;
+  perBagCostUsd?: number;
+  memberBaggageBreakdown?: Array<{
+    name: string;
+    checkedBagsCount: number;
+    isOverweight: boolean;
+    allocatedFeeUsd: number;
+  }>;
+} {
+  if (typeof totalBaggageFeesUsd !== 'number' || totalBaggageFeesUsd <= 0) {
+    return { valid: false, error: 'Total baggage fees must be a positive number' };
+  }
+  if (!Array.isArray(checkedBagsList) || checkedBagsList.length === 0) {
+    return { valid: false, error: 'Checked bags list cannot be empty' };
+  }
+
+  let totalWeightedBags = 0;
+  let totalCheckedBagsCount = 0;
+  const processedMembers: Array<{ name: string; checkedBagsCount: number; isOverweight: boolean; weightFactor: number }> = [];
+
+  for (const item of checkedBagsList) {
+    if (!item || !item.name) continue;
+    const count = typeof item.checkedBagsCount === 'number' && item.checkedBagsCount > 0 ? item.checkedBagsCount : 0;
+    const isOverweight = Boolean(item.isOverweight);
+    const weightFactor = count * (isOverweight ? 1.5 : 1.0);
+
+    totalCheckedBagsCount += count;
+    totalWeightedBags += weightFactor;
+
+    processedMembers.push({
+      name: item.name.trim(),
+      checkedBagsCount: count,
+      isOverweight,
+      weightFactor
+    });
+  }
+
+  if (processedMembers.length === 0 || totalWeightedBags === 0) {
+    return { valid: false, error: 'No valid checked bags found' };
+  }
+
+  const perBagCostUsd = Math.round((totalBaggageFeesUsd / totalCheckedBagsCount) * 100) / 100;
+
+  const memberBaggageBreakdown = processedMembers.map(m => {
+    const allocatedFeeUsd = Math.round((totalBaggageFeesUsd * (m.weightFactor / totalWeightedBags)) * 100) / 100;
+    return {
+      name: m.name,
+      checkedBagsCount: m.checkedBagsCount,
+      isOverweight: m.isOverweight,
+      allocatedFeeUsd
+    };
+  });
+
+  return {
+    valid: true,
+    totalBaggageFeesUsd: Math.round(totalBaggageFeesUsd * 100) / 100,
+    totalCheckedBagsCount,
+    perBagCostUsd,
+    memberBaggageBreakdown
+  };
+}
+
+
 
 
 
