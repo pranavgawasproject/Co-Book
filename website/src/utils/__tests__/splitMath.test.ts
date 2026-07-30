@@ -51,7 +51,8 @@ import {
   calculateGroupTripDynamicStayProRataSplit,
   calculateGroupTripFlightBaggageShareSplit,
   calculateGroupTripRentalCarFuelAndTollSplit,
-  calculateGroupTripAccommodationDepositProration
+  calculateGroupTripAccommodationDepositProration,
+  calculateGroupTravelStaggeredPaymentSchedule
 } from '../splitMath';
 
 
@@ -1147,8 +1148,8 @@ describe('Co-Book Split Math Utility', () => {
       });
       expect(res.valid).toBe(true);
       expect(res.totalDepositUsd).toBe(500);
-      expect(res.perGuestDepositShareMap.Alice).toBe(300);
-      expect(res.perGuestDepositShareMap.Bob).toBe(200);
+      expect(res.perGuestDepositShareMap?.Alice).toBe(300);
+      expect(res.perGuestDepositShareMap?.Bob).toBe(200);
       expect(res.recommendation).toContain('Accommodation deposit of $500.00 prorated');
     });
 
@@ -1156,6 +1157,25 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTripAccommodationDepositProration({ totalDepositUsd: 0 });
       expect(res.valid).toBe(false);
       expect(res.error).toBe('Valid positive total deposit and non-empty guests list required');
+    });
+  });
+
+  describe('calculateGroupTravelStaggeredPaymentSchedule', () => {
+    test('calculates staggered payment schedule correctly for 4 members and 3 phases', () => {
+      const res = calculateGroupTravelStaggeredPaymentSchedule({
+        totalBookingAmountUsd: 1200,
+        memberCount: 4,
+        installmentPhasesCount: 3
+      });
+      expect(res.valid).toBe(true);
+      expect(res.perMemberTotalUsd).toBe(300);
+      expect(res.perMemberPerPhaseUsd).toBe(100);
+    });
+
+    test('returns error for invalid booking amount', () => {
+      const res = calculateGroupTravelStaggeredPaymentSchedule({ totalBookingAmountUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Valid positive total booking amount and member count required');
     });
   });
 });

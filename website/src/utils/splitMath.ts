@@ -2510,6 +2510,50 @@ export function calculateGroupTripAccommodationDepositProration({
   };
 }
 
+export function calculateGroupTravelStaggeredPaymentSchedule({
+  totalBookingAmountUsd = 1200,
+  memberCount = 4,
+  installmentPhasesCount = 3
+}: {
+  totalBookingAmountUsd?: number;
+  memberCount?: number;
+  installmentPhasesCount?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalBookingAmountUsd?: number;
+  memberCount?: number;
+  installmentPhasesCount?: number;
+  perMemberTotalUsd?: number;
+  perMemberPerPhaseUsd?: number;
+  recommendation?: string;
+} {
+  const amount = typeof totalBookingAmountUsd === 'number' && totalBookingAmountUsd > 0 ? totalBookingAmountUsd : 0;
+  const members = typeof memberCount === 'number' && memberCount > 0 ? Math.floor(memberCount) : 0;
+  const phases = typeof installmentPhasesCount === 'number' && installmentPhasesCount > 0 ? Math.floor(installmentPhasesCount) : 1;
+
+  if (amount === 0 || members === 0) {
+    return {
+      valid: false,
+      error: 'Valid positive total booking amount and member count required'
+    };
+  }
+
+  const perMemberTotalUsd = Math.round((amount / members) * 100) / 100;
+  const perMemberPerPhaseUsd = Math.round((perMemberTotalUsd / phases) * 100) / 100;
+
+  return {
+    valid: true,
+    totalBookingAmountUsd: amount,
+    memberCount: members,
+    installmentPhasesCount: phases,
+    perMemberTotalUsd,
+    perMemberPerPhaseUsd,
+    recommendation: `Staggered payment schedule: $${perMemberTotalUsd.toFixed(2)}/person split across ${phases} phase(s) ($${perMemberPerPhaseUsd.toFixed(2)}/phase).`
+  };
+}
+
+
 
 
 
