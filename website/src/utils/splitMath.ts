@@ -2454,6 +2454,63 @@ export function calculateGroupTripRentalCarFuelAndTollSplit(
   };
 }
 
+export function calculateGroupTripAccommodationDepositProration({
+  totalDepositUsd = 500,
+  totalStayNights = 5,
+  guests = [
+    { name: 'Alice', nightsStayed: 5, roomTierMultiplier: 1.5 },
+    { name: 'Bob', nightsStayed: 3, roomTierMultiplier: 1.0 }
+  ]
+}: {
+  totalDepositUsd?: number;
+  totalStayNights?: number;
+  guests?: Array<{ name: string; nightsStayed?: number; roomTierMultiplier?: number }>;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalDepositUsd?: number;
+  totalStayNights?: number;
+  perGuestDepositShareMap?: Record<string, number>;
+  recommendation?: string;
+} {
+  const deposit = typeof totalDepositUsd === 'number' && totalDepositUsd > 0 ? totalDepositUsd : 0;
+  const nights = typeof totalStayNights === 'number' && totalStayNights > 0 ? totalStayNights : 1;
+
+  if (deposit === 0 || !Array.isArray(guests) || guests.length === 0) {
+    return {
+      valid: false,
+      error: 'Valid positive total deposit and non-empty guests list required'
+    };
+  }
+
+  let totalWeights = 0;
+  const processed = guests.map(g => {
+    const gNights = typeof g.nightsStayed === 'number' && g.nightsStayed > 0 ? Math.min(nights, g.nightsStayed) : 1;
+    const mult = typeof g.roomTierMultiplier === 'number' && g.roomTierMultiplier > 0 ? g.roomTierMultiplier : 1.0;
+    const weight = gNights * mult;
+    totalWeights += weight;
+    return { name: g.name || 'Guest', weight };
+  });
+
+  if (totalWeights === 0) {
+    return { valid: false, error: 'Total guest weights cannot be zero' };
+  }
+
+  const perGuestDepositShareMap: Record<string, number> = {};
+  for (const item of processed) {
+    perGuestDepositShareMap[item.name] = Math.round((deposit * (item.weight / totalWeights)) * 100) / 100;
+  }
+
+  return {
+    valid: true,
+    totalDepositUsd: deposit,
+    totalStayNights: nights,
+    perGuestDepositShareMap,
+    recommendation: `Accommodation deposit of $${deposit.toFixed(2)} prorated across ${guests.length} guest(s) based on stay duration and room tier.`
+  };
+}
+
+
 
 
 

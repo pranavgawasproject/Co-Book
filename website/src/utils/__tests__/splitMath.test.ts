@@ -50,8 +50,10 @@ import {
   calculateGroupTripBudgetVarianceAudit,
   calculateGroupTripDynamicStayProRataSplit,
   calculateGroupTripFlightBaggageShareSplit,
-  calculateGroupTripRentalCarFuelAndTollSplit
+  calculateGroupTripRentalCarFuelAndTollSplit,
+  calculateGroupTripAccommodationDepositProration
 } from '../splitMath';
+
 
 
 
@@ -1132,7 +1134,32 @@ describe('Co-Book Split Math Utility', () => {
       expect(inv2.error).toBe('Participants count must be a positive integer');
     });
   });
+
+  describe('calculateGroupTripAccommodationDepositProration', () => {
+    test('prorates accommodation deposit based on stay duration and room tier', () => {
+      const res = calculateGroupTripAccommodationDepositProration({
+        totalDepositUsd: 500,
+        totalStayNights: 5,
+        guests: [
+          { name: 'Alice', nightsStayed: 5, roomTierMultiplier: 1.5 },
+          { name: 'Bob', nightsStayed: 5, roomTierMultiplier: 1.0 }
+        ]
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalDepositUsd).toBe(500);
+      expect(res.perGuestDepositShareMap.Alice).toBe(300);
+      expect(res.perGuestDepositShareMap.Bob).toBe(200);
+      expect(res.recommendation).toContain('Accommodation deposit of $500.00 prorated');
+    });
+
+    test('returns error for empty guests list or zero deposit', () => {
+      const res = calculateGroupTripAccommodationDepositProration({ totalDepositUsd: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Valid positive total deposit and non-empty guests list required');
+    });
+  });
 });
+
 
 
 
