@@ -49,8 +49,10 @@ import {
   calculateGroupTripExpenseReconciliationAudit,
   calculateGroupTripBudgetVarianceAudit,
   calculateGroupTripDynamicStayProRataSplit,
-  calculateGroupTripFlightBaggageShareSplit
+  calculateGroupTripFlightBaggageShareSplit,
+  calculateGroupTripRentalCarFuelAndTollSplit
 } from '../splitMath';
+
 
 
 
@@ -1101,7 +1103,37 @@ describe('Co-Book Split Math Utility', () => {
       expect(invalidList.error).toBe('Checked bags list cannot be empty');
     });
   });
+
+  describe('calculateGroupTripRentalCarFuelAndTollSplit', () => {
+    test('calculates rental car total and driver discount share correctly', () => {
+      const res = calculateGroupTripRentalCarFuelAndTollSplit(300, 80, 40, 4, 25);
+      expect(res.valid).toBe(true);
+      expect(res.totalCarExpenseUsd).toBe(420);
+      expect(res.perPersonStandardShareUsd).toBe(105);
+      expect(res.driverShareUsd).toBe(78.75);
+      expect(res.nonDriverShareUsd).toBe(113.75);
+      expect(res.recommendation).toContain('Designated driver pays $78.75');
+    });
+
+    test('handles solo rental car', () => {
+      const res = calculateGroupTripRentalCarFuelAndTollSplit(200, 50, 20, 1);
+      expect(res.valid).toBe(true);
+      expect(res.totalCarExpenseUsd).toBe(270);
+      expect(res.driverShareUsd).toBe(270);
+    });
+
+    test('returns error for invalid rental fee or participants count', () => {
+      const inv1 = calculateGroupTripRentalCarFuelAndTollSplit(-100, 50, 20, 4);
+      expect(inv1.valid).toBe(false);
+      expect(inv1.error).toBe('Rental fee must be a non-negative number');
+
+      const inv2 = calculateGroupTripRentalCarFuelAndTollSplit(300, 80, 40, 0);
+      expect(inv2.valid).toBe(false);
+      expect(inv2.error).toBe('Participants count must be a positive integer');
+    });
+  });
 });
+
 
 
 

@@ -2400,6 +2400,61 @@ export function calculateGroupTripFlightBaggageShareSplit(
   };
 }
 
+export function calculateGroupTripRentalCarFuelAndTollSplit(
+  rentalFeeUsd: number = 300,
+  fuelExpensesUsd: number = 80,
+  tollsUsd: number = 40,
+  participantsCount: number = 4,
+  primaryDriverDiscountPct: number = 25
+): {
+  valid: boolean;
+  error?: string;
+  totalCarExpenseUsd?: number;
+  perPersonStandardShareUsd?: number;
+  driverShareUsd?: number;
+  nonDriverShareUsd?: number;
+  recommendation?: string;
+} {
+  if (typeof rentalFeeUsd !== 'number' || rentalFeeUsd < 0) {
+    return { valid: false, error: 'Rental fee must be a non-negative number' };
+  }
+  if (typeof participantsCount !== 'number' || participantsCount <= 0) {
+    return { valid: false, error: 'Participants count must be a positive integer' };
+  }
+
+  const fuel = typeof fuelExpensesUsd === 'number' && fuelExpensesUsd >= 0 ? fuelExpensesUsd : 0;
+  const tolls = typeof tollsUsd === 'number' && tollsUsd >= 0 ? tollsUsd : 0;
+  const discountPct = typeof primaryDriverDiscountPct === 'number' && primaryDriverDiscountPct >= 0 && primaryDriverDiscountPct <= 100 ? primaryDriverDiscountPct : 25;
+
+  const totalCarExpenseUsd = Math.round((rentalFeeUsd + fuel + tolls) * 100) / 100;
+  const perPersonStandardShareUsd = Math.round((totalCarExpenseUsd / participantsCount) * 100) / 100;
+
+  if (participantsCount === 1) {
+    return {
+      valid: true,
+      totalCarExpenseUsd,
+      perPersonStandardShareUsd,
+      driverShareUsd: totalCarExpenseUsd,
+      nonDriverShareUsd: 0,
+      recommendation: `Solo rental car total: $${totalCarExpenseUsd.toFixed(2)}.`
+    };
+  }
+
+  const driverShareUsd = Math.round((perPersonStandardShareUsd * (1 - (discountPct / 100))) * 100) / 100;
+  const driverSubsidy = perPersonStandardShareUsd - driverShareUsd;
+  const nonDriverShareUsd = Math.round((perPersonStandardShareUsd + (driverSubsidy / (participantsCount - 1))) * 100) / 100;
+
+  return {
+    valid: true,
+    totalCarExpenseUsd,
+    perPersonStandardShareUsd,
+    driverShareUsd,
+    nonDriverShareUsd,
+    recommendation: `Rental car total $${totalCarExpenseUsd.toFixed(2)}. Designated driver pays $${driverShareUsd.toFixed(2)} (${discountPct}% discount), non-drivers pay $${nonDriverShareUsd.toFixed(2)} each.`
+  };
+}
+
+
 
 
 
