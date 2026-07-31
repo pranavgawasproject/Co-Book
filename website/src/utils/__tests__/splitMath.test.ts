@@ -53,7 +53,8 @@ import {
   calculateGroupTripRentalCarFuelAndTollSplit,
   calculateGroupTripAccommodationDepositProration,
   calculateGroupTravelStaggeredPaymentSchedule,
-  calculateGroupTripCurrencyConversionAndFeeProration
+  calculateGroupTripCurrencyConversionAndFeeProration,
+  calculateGroupFlightSeatUpgradeAllocation
 } from '../splitMath';
 
 
@@ -1199,6 +1200,32 @@ describe('Co-Book Split Math Utility', () => {
       const inv = calculateGroupTripCurrencyConversionAndFeeProration({ foreignAmount: 0 });
       expect(inv.valid).toBe(false);
       expect(inv.error).toBe('Foreign amount must be a positive number');
+    });
+  });
+
+  describe('calculateGroupFlightSeatUpgradeAllocation', () => {
+    test('calculates seat upgrade allocation correctly', () => {
+      const res = calculateGroupFlightSeatUpgradeAllocation({
+        baseTicketCostUsd: 400,
+        upgradeFeeUsd: 120,
+        upgradedParticipantsCount: 2,
+        totalGroupSize: 4
+      });
+      expect(res.valid).toBe(true);
+      expect(res.standardMemberShareUsd).toBe(400);
+      expect(res.upgradedMemberShareUsd).toBe(460);
+      expect(res.totalGroupCostUsd).toBe(1720);
+      expect(res.recommendation).toContain('Standard share: $400.00/person; Upgraded share: $460.00/person');
+    });
+
+    test('returns error for invalid base ticket cost or upgraded count', () => {
+      const inv1 = calculateGroupFlightSeatUpgradeAllocation({ baseTicketCostUsd: 0 });
+      expect(inv1.valid).toBe(false);
+      expect(inv1.error).toBe('Base ticket cost must be a positive number');
+
+      const inv2 = calculateGroupFlightSeatUpgradeAllocation({ upgradedParticipantsCount: 5, totalGroupSize: 4 });
+      expect(inv2.valid).toBe(false);
+      expect(inv2.error).toBe('Upgraded participants count cannot exceed total group size');
     });
   });
 });

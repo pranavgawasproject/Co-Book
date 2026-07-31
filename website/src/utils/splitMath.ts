@@ -2606,6 +2606,60 @@ export function calculateGroupTripCurrencyConversionAndFeeProration({
   };
 }
 
+export function calculateGroupFlightSeatUpgradeAllocation({
+  baseTicketCostUsd = 400,
+  upgradeFeeUsd = 120,
+  upgradedParticipantsCount = 2,
+  totalGroupSize = 4
+}: {
+  baseTicketCostUsd?: number;
+  upgradeFeeUsd?: number;
+  upgradedParticipantsCount?: number;
+  totalGroupSize?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  baseTicketCostUsd?: number;
+  upgradeFeeUsd?: number;
+  upgradedParticipantsCount?: number;
+  totalGroupSize?: number;
+  standardMemberShareUsd?: number;
+  upgradedMemberShareUsd?: number;
+  totalGroupCostUsd?: number;
+  recommendation?: string;
+} {
+  if (typeof baseTicketCostUsd !== 'number' || baseTicketCostUsd <= 0) {
+    return { valid: false, error: 'Base ticket cost must be a positive number' };
+  }
+  if (typeof totalGroupSize !== 'number' || totalGroupSize <= 0) {
+    return { valid: false, error: 'Total group size must be a positive integer' };
+  }
+  if (typeof upgradedParticipantsCount !== 'number' || upgradedParticipantsCount < 0 || upgradedParticipantsCount > totalGroupSize) {
+    return { valid: false, error: 'Upgraded participants count cannot exceed total group size' };
+  }
+
+  const upgradeTotal = typeof upgradeFeeUsd === 'number' && upgradeFeeUsd >= 0 ? upgradeFeeUsd : 0;
+  const standardMemberShareUsd = Math.round(baseTicketCostUsd * 100) / 100;
+  const perPersonUpgradeShareUsd = upgradedParticipantsCount > 0 ? Math.round((upgradeTotal / upgradedParticipantsCount) * 100) / 100 : 0;
+  const upgradedMemberShareUsd = Math.round((standardMemberShareUsd + perPersonUpgradeShareUsd) * 100) / 100;
+  const totalGroupCostUsd = Math.round((baseTicketCostUsd * totalGroupSize + upgradeTotal) * 100) / 100;
+
+  return {
+    valid: true,
+    baseTicketCostUsd,
+    upgradeFeeUsd: upgradeTotal,
+    upgradedParticipantsCount,
+    totalGroupSize,
+    standardMemberShareUsd,
+    upgradedMemberShareUsd,
+    totalGroupCostUsd,
+    recommendation: upgradedParticipantsCount > 0
+      ? `Standard share: $${standardMemberShareUsd.toFixed(2)}/person; Upgraded share: $${upgradedMemberShareUsd.toFixed(2)}/person (includes $${perPersonUpgradeShareUsd.toFixed(2)} upgrade fee).`
+      : `All ${totalGroupSize} travelers pay standard fare $${standardMemberShareUsd.toFixed(2)}.`
+  };
+}
+
+
 
 
 
