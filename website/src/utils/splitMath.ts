@@ -2553,6 +2553,60 @@ export function calculateGroupTravelStaggeredPaymentSchedule({
   };
 }
 
+export function calculateGroupTripCurrencyConversionAndFeeProration({
+  foreignAmount = 500,
+  exchangeRate = 1.08,
+  cardForeignFeePct = 3.0,
+  participantsCount = 4
+}: {
+  foreignAmount?: number;
+  exchangeRate?: number;
+  cardForeignFeePct?: number;
+  participantsCount?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  foreignAmount?: number;
+  exchangeRate?: number;
+  cardForeignFeePct?: number;
+  participantsCount?: number;
+  baseHomeCurrencyUsd?: number;
+  feeAmountUsd?: number;
+  totalGroupHomeCurrencyUsd?: number;
+  perPersonTotalShareUsd?: number;
+  recommendation?: string;
+} {
+  if (typeof foreignAmount !== 'number' || foreignAmount <= 0) {
+    return { valid: false, error: 'Foreign amount must be a positive number' };
+  }
+  if (typeof exchangeRate !== 'number' || exchangeRate <= 0) {
+    return { valid: false, error: 'Exchange rate must be a positive number' };
+  }
+  if (typeof participantsCount !== 'number' || participantsCount <= 0) {
+    return { valid: false, error: 'Participants count must be a positive integer' };
+  }
+
+  const feePct = typeof cardForeignFeePct === 'number' && cardForeignFeePct >= 0 ? cardForeignFeePct : 0;
+  const baseHomeCurrencyUsd = Math.round((foreignAmount * exchangeRate) * 100) / 100;
+  const feeAmountUsd = Math.round((baseHomeCurrencyUsd * (feePct / 100)) * 100) / 100;
+  const totalGroupHomeCurrencyUsd = Math.round((baseHomeCurrencyUsd + feeAmountUsd) * 100) / 100;
+  const perPersonTotalShareUsd = Math.round((totalGroupHomeCurrencyUsd / participantsCount) * 100) / 100;
+
+  return {
+    valid: true,
+    foreignAmount,
+    exchangeRate,
+    cardForeignFeePct: feePct,
+    participantsCount,
+    baseHomeCurrencyUsd,
+    feeAmountUsd,
+    totalGroupHomeCurrencyUsd,
+    perPersonTotalShareUsd,
+    recommendation: `Foreign expense of ${foreignAmount} converted to $${totalGroupHomeCurrencyUsd.toFixed(2)} USD (incl $${feeAmountUsd.toFixed(2)} FX fee), $${perPersonTotalShareUsd.toFixed(2)}/person.`
+  };
+}
+
+
 
 
 

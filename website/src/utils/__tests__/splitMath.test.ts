@@ -52,7 +52,8 @@ import {
   calculateGroupTripFlightBaggageShareSplit,
   calculateGroupTripRentalCarFuelAndTollSplit,
   calculateGroupTripAccommodationDepositProration,
-  calculateGroupTravelStaggeredPaymentSchedule
+  calculateGroupTravelStaggeredPaymentSchedule,
+  calculateGroupTripCurrencyConversionAndFeeProration
 } from '../splitMath';
 
 
@@ -1176,6 +1177,28 @@ describe('Co-Book Split Math Utility', () => {
       const res = calculateGroupTravelStaggeredPaymentSchedule({ totalBookingAmountUsd: 0 });
       expect(res.valid).toBe(false);
       expect(res.error).toBe('Valid positive total booking amount and member count required');
+    });
+  });
+
+  describe('calculateGroupTripCurrencyConversionAndFeeProration', () => {
+    test('calculates currency conversion and FX fee proration correctly', () => {
+      const res = calculateGroupTripCurrencyConversionAndFeeProration({
+        foreignAmount: 500,
+        exchangeRate: 1.08,
+        cardForeignFeePct: 3.0,
+        participantsCount: 4
+      });
+      expect(res.valid).toBe(true);
+      expect(res.baseHomeCurrencyUsd).toBe(540);
+      expect(res.feeAmountUsd).toBe(16.2);
+      expect(res.totalGroupHomeCurrencyUsd).toBe(556.2);
+      expect(res.perPersonTotalShareUsd).toBe(139.05);
+    });
+
+    test('returns error for non-positive foreign amount or exchange rate', () => {
+      const inv = calculateGroupTripCurrencyConversionAndFeeProration({ foreignAmount: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Foreign amount must be a positive number');
     });
   });
 });
