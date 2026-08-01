@@ -55,8 +55,10 @@ import {
   calculateGroupTravelStaggeredPaymentSchedule,
   calculateGroupTripCurrencyConversionAndFeeProration,
   calculateGroupFlightSeatUpgradeAllocation,
-  calculateGroupTripExpenseFairnessIndex
+  calculateGroupTripExpenseFairnessIndex,
+  calculateCoBookMinTransfersSettlementScore
 } from '../splitMath';
+
 
 
 
@@ -1244,7 +1246,34 @@ describe('Co-Book Split Math Utility', () => {
       expect(inv.error).toBe('Participant expenses array cannot be empty');
     });
   });
+
+  describe('calculateCoBookMinTransfersSettlementScore', () => {
+    test('calculates settlement efficiency score and transfer reduction percentage accurately', () => {
+      const res = calculateCoBookMinTransfersSettlementScore({
+        totalTripExpenseUsd: 1200,
+        participantsCount: 4,
+        calculatedTransactionsCount: 2,
+        maxPossibleTransactionsCount: 6
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalTripExpenseUsd).toBe(1200);
+      expect(res.participantsCount).toBe(4);
+      expect(res.calculatedTransactionsCount).toBe(2);
+      expect(res.maxPossibleTransactionsCount).toBe(6);
+      expect(res.transferReductionPct).toBe(66.7);
+      expect(res.efficiencyScore).toBe(67);
+      expect(res.efficiencyTier).toBe('MODERATE_SETTLEMENT_EFFICIENCY');
+      expect(res.recommendation).toContain('Group trip settlement optimized');
+    });
+
+    test('returns invalid for zero trip expense or participant count <= 1', () => {
+      const inv = calculateCoBookMinTransfersSettlementScore({ totalTripExpenseUsd: 0, participantsCount: 1 });
+      expect(inv.valid).toBe(false);
+      expect(inv.efficiencyTier).toBe('INVALID_INPUT');
+    });
+  });
 });
+
 
 
 

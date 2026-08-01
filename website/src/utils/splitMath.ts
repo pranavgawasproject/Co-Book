@@ -2724,6 +2724,71 @@ export function calculateGroupTripExpenseFairnessIndex(
   };
 }
 
+export function calculateCoBookMinTransfersSettlementScore({
+  totalTripExpenseUsd = 1200,
+  participantsCount = 4,
+  calculatedTransactionsCount = 2,
+  maxPossibleTransactionsCount = 6
+}: {
+  totalTripExpenseUsd?: number;
+  participantsCount?: number;
+  calculatedTransactionsCount?: number;
+  maxPossibleTransactionsCount?: number;
+} = {}): {
+  valid: boolean;
+  totalTripExpenseUsd: number;
+  participantsCount: number;
+  calculatedTransactionsCount: number;
+  maxPossibleTransactionsCount: number;
+  transferReductionPct: number;
+  efficiencyScore: number;
+  efficiencyTier: string;
+  recommendation: string;
+} {
+  const expense = typeof totalTripExpenseUsd === 'number' && totalTripExpenseUsd > 0 ? totalTripExpenseUsd : 0;
+  const count = typeof participantsCount === 'number' && participantsCount > 1 ? participantsCount : 0;
+
+  if (expense === 0 || count === 0) {
+    return {
+      valid: false,
+      totalTripExpenseUsd: 0,
+      participantsCount: 0,
+      calculatedTransactionsCount: 0,
+      maxPossibleTransactionsCount: 0,
+      transferReductionPct: 0,
+      efficiencyScore: 0,
+      efficiencyTier: 'INVALID_INPUT',
+      recommendation: 'Valid trip expense and participants count (>1) are required.'
+    };
+  }
+
+  const maxTx = Math.max(1, typeof maxPossibleTransactionsCount === 'number' && maxPossibleTransactionsCount > 0 ? maxPossibleTransactionsCount : count * (count - 1));
+  const calcTx = Math.max(0, typeof calculatedTransactionsCount === 'number' ? calculatedTransactionsCount : 0);
+
+  const transferReductionPct = Math.max(0, Math.round(((maxTx - calcTx) / maxTx) * 100 * 10) / 10);
+  const efficiencyScore = Math.min(100, Math.max(0, Math.round((transferReductionPct / 100) * 100)));
+
+  let efficiencyTier = 'HIGHLY_OPTIMIZED_SETTLEMENT';
+  if (efficiencyScore < 50) {
+    efficiencyTier = 'SUB_OPTIMAL_SETTLEMENT';
+  } else if (efficiencyScore < 80) {
+    efficiencyTier = 'MODERATE_SETTLEMENT_EFFICIENCY';
+  }
+
+  return {
+    valid: true,
+    totalTripExpenseUsd: expense,
+    participantsCount: count,
+    calculatedTransactionsCount: calcTx,
+    maxPossibleTransactionsCount: maxTx,
+    transferReductionPct,
+    efficiencyScore,
+    efficiencyTier,
+    recommendation: `Group trip settlement optimized (${calcTx} transfer(s) vs ${maxTx} maximum, reducing transfers by ${transferReductionPct}%).`
+  };
+}
+
+
 
 
 
