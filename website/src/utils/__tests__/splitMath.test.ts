@@ -54,7 +54,8 @@ import {
   calculateGroupTripAccommodationDepositProration,
   calculateGroupTravelStaggeredPaymentSchedule,
   calculateGroupTripCurrencyConversionAndFeeProration,
-  calculateGroupFlightSeatUpgradeAllocation
+  calculateGroupFlightSeatUpgradeAllocation,
+  calculateGroupTripExpenseFairnessIndex
 } from '../splitMath';
 
 
@@ -1226,6 +1227,21 @@ describe('Co-Book Split Math Utility', () => {
       const inv2 = calculateGroupFlightSeatUpgradeAllocation({ upgradedParticipantsCount: 5, totalGroupSize: 4 });
       expect(inv2.valid).toBe(false);
       expect(inv2.error).toBe('Upgraded participants count cannot exceed total group size');
+    });
+  });
+
+  describe('calculateGroupTripExpenseFairnessIndex', () => {
+    test('calculates balanced spending fairness index for equal expenses', () => {
+      const res = calculateGroupTripExpenseFairnessIndex([100, 100, 100], 100);
+      expect(res.valid).toBe(true);
+      expect(res.fairnessIndexScore).toBe(100);
+      expect(res.fairnessTier).toBe('EQUIVALENT_BALANCED');
+    });
+
+    test('returns error for empty expenses array', () => {
+      const inv = calculateGroupTripExpenseFairnessIndex([], 100);
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Participant expenses array cannot be empty');
     });
   });
 });

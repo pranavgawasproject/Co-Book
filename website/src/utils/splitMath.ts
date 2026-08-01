@@ -2659,6 +2659,72 @@ export function calculateGroupFlightSeatUpgradeAllocation({
   };
 }
 
+export function calculateGroupTripExpenseFairnessIndex(
+  participantExpenses: number[],
+  targetPerPersonShareUsd: number
+): {
+  valid: boolean;
+  participantCount: number;
+  totalGroupSpendUsd: number;
+  averageSpendUsd: number;
+  maxDisparityUsd: number;
+  fairnessIndexScore: number;
+  fairnessTier: string;
+  recommendation: string;
+  error?: string;
+} {
+  if (!Array.isArray(participantExpenses) || participantExpenses.length === 0) {
+    return {
+      valid: false,
+      participantCount: 0,
+      totalGroupSpendUsd: 0,
+      averageSpendUsd: 0,
+      maxDisparityUsd: 0,
+      fairnessIndexScore: 0,
+      fairnessTier: 'INVALID',
+      recommendation: '',
+      error: 'Participant expenses array cannot be empty'
+    };
+  }
+
+  const validExpenses = participantExpenses.map(e => (typeof e === 'number' && e >= 0 ? e : 0));
+  const totalGroupSpendUsd = Math.round(validExpenses.reduce((a, b) => a + b, 0) * 100) / 100;
+  const count = validExpenses.length;
+  const averageSpendUsd = Math.round((totalGroupSpendUsd / count) * 100) / 100;
+
+  const minSpend = Math.min(...validExpenses);
+  const maxSpend = Math.max(...validExpenses);
+  const maxDisparityUsd = Math.round((maxSpend - minSpend) * 100) / 100;
+
+  const target = typeof targetPerPersonShareUsd === 'number' && targetPerPersonShareUsd > 0 ? targetPerPersonShareUsd : averageSpendUsd;
+  const varianceSum = validExpenses.reduce((sum, exp) => sum + Math.abs(exp - target), 0);
+  const avgVariance = varianceSum / count;
+
+  let fairnessIndexScore = Math.max(0, 100 - Math.round((avgVariance / (target || 1)) * 100));
+  fairnessIndexScore = Math.min(100, fairnessIndexScore);
+
+  let fairnessTier = 'EQUIVALENT_BALANCED';
+  if (fairnessIndexScore < 60) {
+    fairnessTier = 'HIGH_DISPARITY';
+  } else if (fairnessIndexScore < 85) {
+    fairnessTier = 'MODERATE_VARIANCE';
+  }
+
+  return {
+    valid: true,
+    participantCount: count,
+    totalGroupSpendUsd,
+    averageSpendUsd,
+    maxDisparityUsd,
+    fairnessIndexScore,
+    fairnessTier,
+    recommendation: fairnessIndexScore >= 85
+      ? `Balanced group spending (${fairnessIndexScore}/100 fairness score). Expenses evenly distributed.`
+      : `High spending variance (${fairnessIndexScore}/100 score). Max disparity: $${maxDisparityUsd.toFixed(2)}.`
+  };
+}
+
+
 
 
 
