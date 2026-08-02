@@ -2819,8 +2819,8 @@ export function calculateCoBookRealtimeCursorSyncBandwidthScore({
   const bytesPerSecond = activeUsersCount * updatesPerSec * payloadBytes;
   const totalKbitsPerSecond = Math.round((bytesPerSecond * 8 / 1000) * 100) / 100;
 
-  let latencyScore = latency <= 50 ? 50 : latency <= 150 ? 30 : 10;
-  let bandwidthScore = totalKbitsPerSecond <= 100 ? 50 : totalKbitsPerSecond <= 500 ? 35 : 15;
+  const latencyScore = latency <= 50 ? 50 : latency <= 150 ? 30 : 10;
+  const bandwidthScore = totalKbitsPerSecond <= 100 ? 50 : totalKbitsPerSecond <= 500 ? 35 : 15;
   const syncQualityScore = Math.min(100, latencyScore + bandwidthScore);
 
   let syncTier = 'OPTIMAL_REALTIME_SYNC';
