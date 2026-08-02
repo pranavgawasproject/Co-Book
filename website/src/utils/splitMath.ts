@@ -2843,6 +2843,64 @@ export function calculateCoBookRealtimeCursorSyncBandwidthScore({
   };
 }
 
+export function calculateCoBookFlightHotelPackageDealSavings({
+  flightStandaloneUsd = 400,
+  hotelStandaloneUsd = 600,
+  bundledPackagePriceUsd = 850,
+  participantsCount = 2
+}: {
+  flightStandaloneUsd?: number;
+  hotelStandaloneUsd?: number;
+  bundledPackagePriceUsd?: number;
+  participantsCount?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalStandaloneUsd?: number;
+  bundledPackagePriceUsd?: number;
+  totalSavingsUsd?: number;
+  savingsPercentage?: number;
+  perPersonPackagePriceUsd?: number;
+  savingsTier?: string;
+  recommendation?: string;
+} {
+  if (typeof flightStandaloneUsd !== 'number' || flightStandaloneUsd <= 0) {
+    return { valid: false, error: 'Flight standalone cost must be a positive number' };
+  }
+  if (typeof hotelStandaloneUsd !== 'number' || hotelStandaloneUsd <= 0) {
+    return { valid: false, error: 'Hotel standalone cost must be a positive number' };
+  }
+  if (typeof bundledPackagePriceUsd !== 'number' || bundledPackagePriceUsd <= 0) {
+    return { valid: false, error: 'Bundled package price must be a positive number' };
+  }
+
+  const members = typeof participantsCount === 'number' && participantsCount > 0 ? Math.floor(participantsCount) : 1;
+  const totalStandaloneUsd = Math.round((flightStandaloneUsd + hotelStandaloneUsd) * 100) / 100;
+  const totalSavingsUsd = Math.max(0, Math.round((totalStandaloneUsd - bundledPackagePriceUsd) * 100) / 100);
+  const savingsPercentage = Math.round((totalSavingsUsd / totalStandaloneUsd) * 100 * 10) / 10;
+  const perPersonPackagePriceUsd = Math.round((bundledPackagePriceUsd / members) * 100) / 100;
+
+  let savingsTier = 'HIGH_VALUE_BUNDLE_DEAL';
+  if (totalSavingsUsd === 0) {
+    savingsTier = 'NO_PACKAGE_SAVINGS';
+  } else if (savingsPercentage < 10) {
+    savingsTier = 'MODERATE_BUNDLE_SAVINGS';
+  }
+
+  return {
+    valid: true,
+    totalStandaloneUsd,
+    bundledPackagePriceUsd,
+    totalSavingsUsd,
+    savingsPercentage,
+    perPersonPackagePriceUsd,
+    savingsTier,
+    recommendation: totalSavingsUsd > 0
+      ? `Package bundle saves $${totalSavingsUsd.toFixed(2)} (${savingsPercentage}% savings vs standalone flights & hotel). $${perPersonPackagePriceUsd.toFixed(2)}/person.`
+      : `No bundle discount found ($${totalStandaloneUsd.toFixed(2)} total). Standalone bookings recommended.`
+  };
+}
+
 
 
 

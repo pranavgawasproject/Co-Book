@@ -57,7 +57,8 @@ import {
   calculateGroupFlightSeatUpgradeAllocation,
   calculateGroupTripExpenseFairnessIndex,
   calculateCoBookMinTransfersSettlementScore,
-  calculateCoBookRealtimeCursorSyncBandwidthScore
+  calculateCoBookRealtimeCursorSyncBandwidthScore,
+  calculateCoBookFlightHotelPackageDealSavings
 } from '../splitMath';
 
 
@@ -1294,6 +1295,30 @@ describe('Co-Book Split Math Utility', () => {
       const inv = calculateCoBookRealtimeCursorSyncBandwidthScore({ activeUsersCount: 0 });
       expect(inv.valid).toBe(false);
       expect(inv.error).toBe('Active users count must be a positive integer');
+    });
+  });
+
+  describe('calculateCoBookFlightHotelPackageDealSavings', () => {
+    test('calculates package bundle savings correctly when deal is present', () => {
+      const res = calculateCoBookFlightHotelPackageDealSavings({
+        flightStandaloneUsd: 400,
+        hotelStandaloneUsd: 600,
+        bundledPackagePriceUsd: 850,
+        participantsCount: 2
+      });
+      expect(res.valid).toBe(true);
+      expect(res.totalStandaloneUsd).toBe(1000);
+      expect(res.totalSavingsUsd).toBe(150);
+      expect(res.savingsPercentage).toBe(15);
+      expect(res.perPersonPackagePriceUsd).toBe(425);
+      expect(res.savingsTier).toBe('HIGH_VALUE_BUNDLE_DEAL');
+      expect(res.recommendation).toContain('Package bundle saves $150.00');
+    });
+
+    test('returns error for invalid non-positive standalone flight cost', () => {
+      const inv = calculateCoBookFlightHotelPackageDealSavings({ flightStandaloneUsd: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Flight standalone cost must be a positive number');
     });
   });
 });
