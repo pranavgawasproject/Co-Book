@@ -56,7 +56,8 @@ import {
   calculateGroupTripCurrencyConversionAndFeeProration,
   calculateGroupFlightSeatUpgradeAllocation,
   calculateGroupTripExpenseFairnessIndex,
-  calculateCoBookMinTransfersSettlementScore
+  calculateCoBookMinTransfersSettlementScore,
+  calculateCoBookRealtimeCursorSyncBandwidthScore
 } from '../splitMath';
 
 
@@ -1270,6 +1271,29 @@ describe('Co-Book Split Math Utility', () => {
       const inv = calculateCoBookMinTransfersSettlementScore({ totalTripExpenseUsd: 0, participantsCount: 1 });
       expect(inv.valid).toBe(false);
       expect(inv.efficiencyTier).toBe('INVALID_INPUT');
+    });
+  });
+
+  describe('calculateCoBookRealtimeCursorSyncBandwidthScore', () => {
+    test('calculates cursor sync bandwidth and quality score correctly', () => {
+      const res = calculateCoBookRealtimeCursorSyncBandwidthScore({
+        activeUsersCount: 5,
+        cursorUpdatesPerSecondPerUser: 30,
+        payloadSizeBytes: 64,
+        networkLatencyMs: 45
+      });
+      expect(res.valid).toBe(true);
+      expect(res.activeUsersCount).toBe(5);
+      expect(res.totalKbitsPerSecond).toBe(76.8);
+      expect(res.syncQualityScore).toBe(100);
+      expect(res.syncTier).toBe('OPTIMAL_REALTIME_SYNC');
+      expect(res.recommendation).toContain('Ultra-smooth multiplayer cursor sync');
+    });
+
+    test('returns error for invalid non-positive active users count', () => {
+      const inv = calculateCoBookRealtimeCursorSyncBandwidthScore({ activeUsersCount: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Active users count must be a positive integer');
     });
   });
 });

@@ -2788,6 +2788,62 @@ export function calculateCoBookMinTransfersSettlementScore({
   };
 }
 
+export function calculateCoBookRealtimeCursorSyncBandwidthScore({
+  activeUsersCount = 5,
+  cursorUpdatesPerSecondPerUser = 30,
+  payloadSizeBytes = 64,
+  networkLatencyMs = 45
+}: {
+  activeUsersCount?: number;
+  cursorUpdatesPerSecondPerUser?: number;
+  payloadSizeBytes?: number;
+  networkLatencyMs?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  activeUsersCount?: number;
+  totalKbitsPerSecond?: number;
+  latencyMs?: number;
+  syncQualityScore?: number;
+  syncTier?: string;
+  recommendation?: string;
+} {
+  if (typeof activeUsersCount !== 'number' || activeUsersCount <= 0) {
+    return { valid: false, error: 'Active users count must be a positive integer' };
+  }
+
+  const updatesPerSec = typeof cursorUpdatesPerSecondPerUser === 'number' && cursorUpdatesPerSecondPerUser > 0 ? cursorUpdatesPerSecondPerUser : 30;
+  const payloadBytes = typeof payloadSizeBytes === 'number' && payloadSizeBytes > 0 ? payloadSizeBytes : 64;
+  const latency = typeof networkLatencyMs === 'number' && networkLatencyMs >= 0 ? networkLatencyMs : 50;
+
+  const bytesPerSecond = activeUsersCount * updatesPerSec * payloadBytes;
+  const totalKbitsPerSecond = Math.round((bytesPerSecond * 8 / 1000) * 100) / 100;
+
+  let latencyScore = latency <= 50 ? 50 : latency <= 150 ? 30 : 10;
+  let bandwidthScore = totalKbitsPerSecond <= 100 ? 50 : totalKbitsPerSecond <= 500 ? 35 : 15;
+  const syncQualityScore = Math.min(100, latencyScore + bandwidthScore);
+
+  let syncTier = 'OPTIMAL_REALTIME_SYNC';
+  if (syncQualityScore < 50) {
+    syncTier = 'LAGGY_CURSOR_SYNC';
+  } else if (syncQualityScore < 80) {
+    syncTier = 'ACCEPTABLE_SYNC_QUALITY';
+  }
+
+  return {
+    valid: true,
+    activeUsersCount,
+    totalKbitsPerSecond,
+    latencyMs: latency,
+    syncQualityScore,
+    syncTier,
+    recommendation: syncQualityScore >= 80
+      ? `Ultra-smooth multiplayer cursor sync across ${activeUsersCount} users (${totalKbitsPerSecond} kbps bandwidth, ${latency}ms latency).`
+      : `Real-time cursor sync experiencing minor latency or high bandwidth usage (${totalKbitsPerSecond} kbps). Recommend throttling update rate.`
+  };
+}
+
+
 
 
 
