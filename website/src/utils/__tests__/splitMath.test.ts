@@ -58,7 +58,8 @@ import {
   calculateGroupTripExpenseFairnessIndex,
   calculateCoBookMinTransfersSettlementScore,
   calculateCoBookRealtimeCursorSyncBandwidthScore,
-  calculateCoBookFlightHotelPackageDealSavings
+  calculateCoBookFlightHotelPackageDealSavings,
+  calculateCoBookGroupTravelExpenseReconciliationScore
 } from '../splitMath';
 
 
@@ -1319,6 +1320,28 @@ describe('Co-Book Split Math Utility', () => {
       const inv = calculateCoBookFlightHotelPackageDealSavings({ flightStandaloneUsd: 0 });
       expect(inv.valid).toBe(false);
       expect(inv.error).toBe('Flight standalone cost must be a positive number');
+    });
+  });
+
+  describe('calculateCoBookGroupTravelExpenseReconciliationScore', () => {
+    test('calculates score and AUDIT_READY_RECONCILIATION tier when pristine', () => {
+      const res = calculateCoBookGroupTravelExpenseReconciliationScore({
+        totalExpensesCount: 12,
+        totalExpenseUsd: 2400,
+        unreconciledItemsCount: 0,
+        receiptImageProofRatio: 1.0,
+        disputedAmountUsd: 0
+      });
+      expect(res.valid).toBe(true);
+      expect(res.reconciliationScore).toBe(100);
+      expect(res.reconciliationTier).toBe('AUDIT_READY_RECONCILIATION');
+      expect(res.recommendation).toContain('Group trip expenses fully reconciled');
+    });
+
+    test('returns error for invalid non-positive total expenses count', () => {
+      const res = calculateCoBookGroupTravelExpenseReconciliationScore({ totalExpensesCount: 0 });
+      expect(res.valid).toBe(false);
+      expect(res.error).toBe('Total expenses count must be a positive integer');
     });
   });
 });

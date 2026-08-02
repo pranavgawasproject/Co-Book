@@ -2901,6 +2901,60 @@ export function calculateCoBookFlightHotelPackageDealSavings({
   };
 }
 
+export function calculateCoBookGroupTravelExpenseReconciliationScore({
+  totalExpensesCount = 12,
+  totalExpenseUsd = 2400,
+  unreconciledItemsCount = 0,
+  receiptImageProofRatio = 1.0,
+  disputedAmountUsd = 0
+}: {
+  totalExpensesCount?: number;
+  totalExpenseUsd?: number;
+  unreconciledItemsCount?: number;
+  receiptImageProofRatio?: number;
+  disputedAmountUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  reconciliationScore?: number;
+  reconciliationTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalExpensesCount !== 'number' || totalExpensesCount <= 0) {
+    return { valid: false, error: 'Total expenses count must be a positive integer' };
+  }
+  if (typeof totalExpenseUsd !== 'number' || totalExpenseUsd <= 0) {
+    return { valid: false, error: 'Total expense amount must be a positive number' };
+  }
+
+  const unreconciled = typeof unreconciledItemsCount === 'number' && unreconciledItemsCount >= 0 ? unreconciledItemsCount : 0;
+  const proofRatio = typeof receiptImageProofRatio === 'number' ? Math.max(0, Math.min(1, receiptImageProofRatio)) : 1.0;
+  const disputes = typeof disputedAmountUsd === 'number' && disputedAmountUsd >= 0 ? disputedAmountUsd : 0;
+
+  let score = 100;
+  score -= (unreconciled / totalExpensesCount) * 40;
+  score -= (1 - proofRatio) * 30;
+  score -= Math.min(30, (disputes / totalExpenseUsd) * 50);
+
+  const reconciliationScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let reconciliationTier = 'AUDIT_READY_RECONCILIATION';
+  if (reconciliationScore < 50) {
+    reconciliationTier = 'HIGH_RECONCILIATION_FRICTION';
+  } else if (reconciliationScore < 80) {
+    reconciliationTier = 'MODERATE_UNRESOLVED_EXPENSES';
+  }
+
+  return {
+    valid: true,
+    reconciliationScore,
+    reconciliationTier,
+    recommendation: reconciliationScore >= 80
+      ? `Group trip expenses fully reconciled (${reconciliationScore}/100 score). High audit integrity across all ${totalExpensesCount} items.`
+      : `Group reconciliation needs review (${reconciliationScore}/100 score, ${unreconciled} pending item(s)).`
+  };
+}
+
 
 
 
