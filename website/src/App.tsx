@@ -23,6 +23,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="*" element={<Home />} />
       </Routes>
     </Router>
   );
