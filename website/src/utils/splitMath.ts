@@ -2955,6 +2955,68 @@ export function calculateCoBookGroupTravelExpenseReconciliationScore({
   };
 }
 
+export function calculateCoBookGroupFlightItineraryAlignmentScore({
+  memberArrivalTimesHours = [12.0, 13.5, 12.5, 14.0],
+  maxAcceptableSpreadHours = 3.0,
+  sameArrivalAirport = true
+}: {
+  memberArrivalTimesHours?: number[];
+  maxAcceptableSpreadHours?: number;
+  sameArrivalAirport?: boolean;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  memberCount?: number;
+  arrivalSpreadHours?: number;
+  isSameAirport?: boolean;
+  alignmentScore?: number;
+  alignmentTier?: string;
+  recommendation?: string;
+} {
+  if (!Array.isArray(memberArrivalTimesHours) || memberArrivalTimesHours.length === 0) {
+    return { valid: false, error: 'Member arrival times array cannot be empty' };
+  }
+
+  const times = memberArrivalTimesHours.filter(t => typeof t === 'number' && !isNaN(t));
+  if (times.length === 0) {
+    return { valid: false, error: 'Member arrival times must contain valid numbers' };
+  }
+
+  const minTime = Math.min(...times);
+  const maxTime = Math.max(...times);
+  const arrivalSpreadHours = Math.round((maxTime - minTime) * 10) / 10;
+  const targetSpread = typeof maxAcceptableSpreadHours === 'number' && maxAcceptableSpreadHours > 0 ? maxAcceptableSpreadHours : 3.0;
+
+  let score = 100;
+  if (!sameArrivalAirport) score -= 40;
+  if (arrivalSpreadHours > targetSpread) {
+    const excess = arrivalSpreadHours - targetSpread;
+    score -= Math.min(50, Math.round(excess * 15));
+  }
+
+  const alignmentScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let alignmentTier = 'OPTIMAL_ITINERARY_ALIGNMENT';
+  if (alignmentScore <= 50) {
+    alignmentTier = 'POOR_ITINERARY_ALIGNMENT';
+  } else if (alignmentScore < 80) {
+    alignmentTier = 'MODERATE_ARRIVAL_SPREAD';
+  }
+
+  return {
+    valid: true,
+    memberCount: times.length,
+    arrivalSpreadHours,
+    isSameAirport: Boolean(sameArrivalAirport),
+    alignmentScore,
+    alignmentTier,
+    recommendation: alignmentScore >= 80
+      ? `Flight itineraries well-aligned (${arrivalSpreadHours}h arrival spread across ${times.length} members). Optimal group meetup window.`
+      : `Flight arrival times staggered by ${arrivalSpreadHours}h (target: ${targetSpread}h). Recommend adjusting flight selections.`
+  };
+}
+
+
 
 
 

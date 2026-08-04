@@ -59,7 +59,8 @@ import {
   calculateCoBookMinTransfersSettlementScore,
   calculateCoBookRealtimeCursorSyncBandwidthScore,
   calculateCoBookFlightHotelPackageDealSavings,
-  calculateCoBookGroupTravelExpenseReconciliationScore
+  calculateCoBookGroupTravelExpenseReconciliationScore,
+  calculateCoBookGroupFlightItineraryAlignmentScore
 } from '../splitMath';
 
 
@@ -1344,7 +1345,42 @@ describe('Co-Book Split Math Utility', () => {
       expect(res.error).toBe('Total expenses count must be a positive integer');
     });
   });
+
+  describe('calculateCoBookGroupFlightItineraryAlignmentScore', () => {
+    test('calculates high alignment score when arrival times are closely staggered', () => {
+      const res = calculateCoBookGroupFlightItineraryAlignmentScore({
+        memberArrivalTimesHours: [12.0, 12.5, 13.0, 13.5],
+        maxAcceptableSpreadHours: 3.0,
+        sameArrivalAirport: true
+      });
+      expect(res.valid).toBe(true);
+      expect(res.memberCount).toBe(4);
+      expect(res.arrivalSpreadHours).toBe(1.5);
+      expect(res.alignmentScore).toBe(100);
+      expect(res.alignmentTier).toBe('OPTIMAL_ITINERARY_ALIGNMENT');
+      expect(res.recommendation).toContain('Flight itineraries well-aligned');
+    });
+
+    test('reduces alignment score when arrival times exceed target spread', () => {
+      const res = calculateCoBookGroupFlightItineraryAlignmentScore({
+        memberArrivalTimesHours: [10.0, 16.0],
+        maxAcceptableSpreadHours: 2.0,
+        sameArrivalAirport: true
+      });
+      expect(res.valid).toBe(true);
+      expect(res.arrivalSpreadHours).toBe(6.0);
+      expect(res.alignmentScore).toBeLessThan(80);
+      expect(res.alignmentTier).toBe('POOR_ITINERARY_ALIGNMENT');
+    });
+
+    test('returns error for empty member arrival times array', () => {
+      const inv = calculateCoBookGroupFlightItineraryAlignmentScore({ memberArrivalTimesHours: [] });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Member arrival times array cannot be empty');
+    });
+  });
 });
+
 
 
 
