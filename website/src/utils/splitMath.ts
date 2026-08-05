@@ -3016,6 +3016,62 @@ export function calculateCoBookGroupFlightItineraryAlignmentScore({
   };
 }
 
+export function calculateGroupTripItineraryFeasibilityIndex({
+  totalActivitiesCount = 8,
+  totalTravelDays = 4,
+  totalDistanceKm = 300,
+  maxDailyTravelHours = 4.0
+}: {
+  totalActivitiesCount?: number;
+  totalTravelDays?: number;
+  totalDistanceKm?: number;
+  maxDailyTravelHours?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  activitiesPerDay?: number;
+  estimatedDailyTravelHours?: number;
+  feasibilityScore?: number;
+  feasibilityTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalActivitiesCount !== 'number' || totalActivitiesCount <= 0) {
+    return { valid: false, error: 'Total activities count must be a positive integer' };
+  }
+  if (typeof totalTravelDays !== 'number' || totalTravelDays <= 0) {
+    return { valid: false, error: 'Total travel days must be a positive integer' };
+  }
+
+  const activitiesPerDay = Math.round((totalActivitiesCount / totalTravelDays) * 10) / 10;
+  const distance = typeof totalDistanceKm === 'number' && totalDistanceKm >= 0 ? totalDistanceKm : 0;
+  const estimatedDailyTravelHours = Math.round(((distance / 60) / totalTravelDays) * 10) / 10;
+
+  let score = 100;
+  if (activitiesPerDay > 4) score -= (activitiesPerDay - 4) * 15;
+  if (estimatedDailyTravelHours > maxDailyTravelHours) score -= (estimatedDailyTravelHours - maxDailyTravelHours) * 20;
+
+  const feasibilityScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let feasibilityTier = 'FEASIBLE_WELL_PACED';
+  if (feasibilityScore < 50) {
+    feasibilityTier = 'OVERCROWDED_BURNOUT_RISK';
+  } else if (feasibilityScore < 80) {
+    feasibilityTier = 'MODERATE_PACING';
+  }
+
+  return {
+    valid: true,
+    activitiesPerDay,
+    estimatedDailyTravelHours,
+    feasibilityScore,
+    feasibilityTier,
+    recommendation: feasibilityScore >= 80
+      ? `Itinerary is well-paced (${activitiesPerDay} activities/day, ${estimatedDailyTravelHours}h travel/day).`
+      : `Pacing warning: ${activitiesPerDay} activities/day may cause burnout. Reduce daily activities.`
+  };
+}
+
+
 
 
 

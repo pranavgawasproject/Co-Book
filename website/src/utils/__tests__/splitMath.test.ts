@@ -60,7 +60,8 @@ import {
   calculateCoBookRealtimeCursorSyncBandwidthScore,
   calculateCoBookFlightHotelPackageDealSavings,
   calculateCoBookGroupTravelExpenseReconciliationScore,
-  calculateCoBookGroupFlightItineraryAlignmentScore
+  calculateCoBookGroupFlightItineraryAlignmentScore,
+  calculateGroupTripItineraryFeasibilityIndex
 } from '../splitMath';
 
 
@@ -1377,6 +1378,32 @@ describe('Co-Book Split Math Utility', () => {
       const inv = calculateCoBookGroupFlightItineraryAlignmentScore({ memberArrivalTimesHours: [] });
       expect(inv.valid).toBe(false);
       expect(inv.error).toBe('Member arrival times array cannot be empty');
+    });
+  });
+
+  describe('calculateGroupTripItineraryFeasibilityIndex', () => {
+    test('calculates well-paced itinerary feasibility index correctly', () => {
+      const res = calculateGroupTripItineraryFeasibilityIndex({
+        totalActivitiesCount: 8,
+        totalTravelDays: 4,
+        totalDistanceKm: 120,
+        maxDailyTravelHours: 4.0
+      });
+      expect(res.valid).toBe(true);
+      expect(res.activitiesPerDay).toBe(2);
+      expect(res.feasibilityScore).toBe(100);
+      expect(res.feasibilityTier).toBe('FEASIBLE_WELL_PACED');
+      expect(res.recommendation).toContain('Itinerary is well-paced');
+    });
+
+    test('returns error for non-positive activity count or travel days', () => {
+      const inv = calculateGroupTripItineraryFeasibilityIndex({ totalActivitiesCount: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Total activities count must be a positive integer');
+
+      const invDays = calculateGroupTripItineraryFeasibilityIndex({ totalTravelDays: 0 });
+      expect(invDays.valid).toBe(false);
+      expect(invDays.error).toBe('Total travel days must be a positive integer');
     });
   });
 });
