@@ -61,7 +61,8 @@ import {
   calculateCoBookFlightHotelPackageDealSavings,
   calculateCoBookGroupTravelExpenseReconciliationScore,
   calculateCoBookGroupFlightItineraryAlignmentScore,
-  calculateGroupTripItineraryFeasibilityIndex
+  calculateGroupTripItineraryFeasibilityIndex,
+  calculateGroupBookingFareDisputeSettlement
 } from '../splitMath';
 
 
@@ -1406,7 +1407,30 @@ describe('Co-Book Split Math Utility', () => {
       expect(invDays.error).toBe('Total travel days must be a positive integer');
     });
   });
+
+  describe('calculateGroupBookingFareDisputeSettlement', () => {
+    test('calculates fair dispute settlement across non-exempt group members', () => {
+      const res = calculateGroupBookingFareDisputeSettlement({
+        totalBookingCost: 1200,
+        disputedAmount: 300,
+        participatingMembers: ['Alice', 'Bob', 'Charlie'],
+        exemptMembers: ['Charlie']
+      });
+      expect(res.valid).toBe(true);
+      expect(res.baseSharePerMember).toBe(400);
+      expect(res.adjustedSharePerMember?.Alice).toBe(550);
+      expect(res.adjustedSharePerMember?.Bob).toBe(550);
+      expect(res.adjustedSharePerMember?.Charlie).toBe(400);
+    });
+
+    test('returns invalid for zero booking cost or empty member list', () => {
+      const inv = calculateGroupBookingFareDisputeSettlement({ totalBookingCost: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Total booking cost must be a positive number');
+    });
+  });
 });
+
 
 
 

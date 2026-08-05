@@ -3071,6 +3071,61 @@ export function calculateGroupTripItineraryFeasibilityIndex({
   };
 }
 
+export function calculateGroupBookingFareDisputeSettlement({
+  totalBookingCost = 1200,
+  disputedAmount = 200,
+  participatingMembers = ['Alice', 'Bob', 'Charlie'],
+  exemptMembers = ['Charlie']
+}: {
+  totalBookingCost?: number;
+  disputedAmount?: number;
+  participatingMembers?: string[];
+  exemptMembers?: string[];
+} = {}): {
+  valid: boolean;
+  error?: string;
+  baseSharePerMember?: number;
+  adjustedSharePerMember?: Record<string, number>;
+  settlementStatus?: string;
+  recommendation?: string;
+} {
+  if (typeof totalBookingCost !== 'number' || totalBookingCost <= 0) {
+    return { valid: false, error: 'Total booking cost must be a positive number' };
+  }
+  if (!Array.isArray(participatingMembers) || participatingMembers.length === 0) {
+    return { valid: false, error: 'Participating members list cannot be empty' };
+  }
+
+  const totalMembers = participatingMembers.length;
+  const exempt = new Set(Array.isArray(exemptMembers) ? exemptMembers : []);
+  const activeCount = totalMembers - exempt.size;
+
+  if (activeCount <= 0) {
+    return { valid: false, error: 'At least one non-exempt member is required to settle disputed amount' };
+  }
+
+  const baseShare = Math.round((totalBookingCost / totalMembers) * 100) / 100;
+  const DisputePerActiveMember = Math.round(((disputedAmount || 0) / activeCount) * 100) / 100;
+
+  const adjustedSharePerMember: Record<string, number> = {};
+  for (const member of participatingMembers) {
+    if (exempt.has(member)) {
+      adjustedSharePerMember[member] = baseShare;
+    } else {
+      adjustedSharePerMember[member] = Math.round((baseShare + DisputePerActiveMember) * 100) / 100;
+    }
+  }
+
+  return {
+    valid: true,
+    baseSharePerMember: baseShare,
+    adjustedSharePerMember,
+    settlementStatus: 'FAIR_SETTLEMENT_CALCULATED',
+    recommendation: `Disputed amount ($${disputedAmount}) split fairly across ${activeCount} non-exempt group members.`
+  };
+}
+
+
 
 
 
