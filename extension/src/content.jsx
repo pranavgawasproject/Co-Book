@@ -31,6 +31,7 @@ if (!document.getElementById('splitsync-extension-root')) {
   // 5. native Checkout Hijack
   // Intercepting clicks at the capture phase to block the host site's native checkout sequence
   document.body.addEventListener('click', (e) => {
+     if (!e.target || typeof e.target.closest !== 'function') return;
      // Airbnb's Reserve button or Confirm button tests
      const checkoutBtn = e.target.closest("button[data-testid='homes-pdp-cta-btn'], button[data-testid='quick-pay-button']");
      

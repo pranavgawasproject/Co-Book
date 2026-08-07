@@ -171,11 +171,11 @@ CREATE POLICY "shortlist_update_all" ON public.shortlisted_properties
   FOR UPDATE USING (auth.uid() IS NOT NULL);
 
 -- Enable Realtime for the board
-DO 
+DO $$
 BEGIN
   BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.shortlisted_properties;
   EXCEPTION WHEN duplicate_object THEN
     RAISE NOTICE 'shortlisted_properties is already in supabase_realtime - skipping.';
   END;
-END ;
+END $$;
