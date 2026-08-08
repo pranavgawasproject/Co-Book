@@ -65,7 +65,8 @@ import {
   calculateGroupBookingFareDisputeSettlement,
   calculateGroupTripRealtimePresenceAndCursorSyncScore,
   calculateCoBookGroupTravelHoldLockEscrowAllocation,
-  calculateCoBookGroupExpenseDisputeSettlementMatrix
+  calculateCoBookGroupExpenseDisputeSettlementMatrix,
+  calculateGroupTripInstallmentDefaultReallocation
 } from '../splitMath';
 
 
@@ -1507,6 +1508,51 @@ describe('Co-Book Split Math Utility', () => {
       const invMembers = calculateCoBookGroupExpenseDisputeSettlementMatrix({ contestingMembersCount: 0 });
       expect(invMembers.valid).toBe(false);
       expect(invMembers.error).toBe('Contesting members count must be a positive integer');
+    });
+  });
+
+  describe('calculateGroupTripInstallmentDefaultReallocation', () => {
+    test('calculates installment reallocation when a group member defaults', () => {
+      const res = calculateGroupTripInstallmentDefaultReallocation({
+        totalInstallmentAmountUsd: 1200,
+        originalActiveMembersCount: 4,
+        defaultingMembersCount: 1,
+        forfeitedDepositUsd: 100,
+        lateFeePenaltyUsd: 50
+      });
+
+      expect(res.valid).toBe(true);
+      expect(res.originalActiveMembersCount).toBe(4);
+      expect(res.remainingActiveMembersCount).toBe(3);
+      expect(res.originalPerMemberInstallmentUsd).toBe(300);
+      expect(res.absorbedDefaultAmountUsd).toBe(250);
+      expect(res.reallocatedPerMemberInstallmentUsd).toBe(383.33);
+      expect(res.installmentStatusTier).toBe('REALLOCATED_SHARE_INCREASED');
+    });
+
+    test('handles default fully offset by forfeited deposit', () => {
+      const res = calculateGroupTripInstallmentDefaultReallocation({
+        totalInstallmentAmountUsd: 1200,
+        originalActiveMembersCount: 4,
+        defaultingMembersCount: 1,
+        forfeitedDepositUsd: 400,
+        lateFeePenaltyUsd: 0
+      });
+
+      expect(res.valid).toBe(true);
+      expect(res.absorbedDefaultAmountUsd).toBe(0);
+      expect(res.reallocatedPerMemberInstallmentUsd).toBe(300);
+      expect(res.installmentStatusTier).toBe('DEFAULT_FULLY_OFFSET_BY_DEPOSIT');
+    });
+
+    test('returns error for invalid inputs', () => {
+      const invAmt = calculateGroupTripInstallmentDefaultReallocation({ totalInstallmentAmountUsd: -100 });
+      expect(invAmt.valid).toBe(false);
+      expect(invAmt.error).toBe('Total installment amount must be a positive number');
+
+      const invDef = calculateGroupTripInstallmentDefaultReallocation({ defaultingMembersCount: 4, originalActiveMembersCount: 4 });
+      expect(invDef.valid).toBe(false);
+      expect(invDef.error).toBe('Defaulting members cannot equal or exceed total group size');
     });
   });
 });

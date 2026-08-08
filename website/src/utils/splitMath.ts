@@ -3321,6 +3321,83 @@ export function calculateCoBookGroupExpenseDisputeSettlementMatrix({
   };
 }
 
+export function calculateGroupTripInstallmentDefaultReallocation({
+  totalInstallmentAmountUsd = 1200,
+  originalActiveMembersCount = 4,
+  defaultingMembersCount = 1,
+  forfeitedDepositUsd = 200,
+  lateFeePenaltyUsd = 50
+}: {
+  totalInstallmentAmountUsd?: number;
+  originalActiveMembersCount?: number;
+  defaultingMembersCount?: number;
+  forfeitedDepositUsd?: number;
+  lateFeePenaltyUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalInstallmentAmountUsd?: number;
+  originalActiveMembersCount?: number;
+  defaultingMembersCount?: number;
+  remainingActiveMembersCount?: number;
+  originalPerMemberInstallmentUsd?: number;
+  absorbedDefaultAmountUsd?: number;
+  netRemainingInstallmentUsd?: number;
+  reallocatedPerMemberInstallmentUsd?: number;
+  installmentStatusTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalInstallmentAmountUsd !== 'number' || totalInstallmentAmountUsd <= 0) {
+    return { valid: false, error: 'Total installment amount must be a positive number' };
+  }
+  if (typeof originalActiveMembersCount !== 'number' || originalActiveMembersCount <= 0 || !Number.isInteger(originalActiveMembersCount)) {
+    return { valid: false, error: 'Original active members count must be a positive integer' };
+  }
+  if (typeof defaultingMembersCount !== 'number' || defaultingMembersCount < 0 || !Number.isInteger(defaultingMembersCount)) {
+    return { valid: false, error: 'Defaulting members count must be a non-negative integer' };
+  }
+  if (defaultingMembersCount >= originalActiveMembersCount) {
+    return { valid: false, error: 'Defaulting members cannot equal or exceed total group size' };
+  }
+
+  const remainingActiveMembersCount = originalActiveMembersCount - defaultingMembersCount;
+  const originalPerMemberInstallmentUsd = Math.round((totalInstallmentAmountUsd / originalActiveMembersCount) * 100) / 100;
+
+  const depositCredit = typeof forfeitedDepositUsd === 'number' && forfeitedDepositUsd >= 0 ? forfeitedDepositUsd : 0;
+  const lateFee = typeof lateFeePenaltyUsd === 'number' && lateFeePenaltyUsd >= 0 ? lateFeePenaltyUsd : 0;
+
+  const rawDefaultedDebt = defaultingMembersCount * originalPerMemberInstallmentUsd;
+  const absorbedDefaultAmountUsd = Math.max(0, Math.round((rawDefaultedDebt - depositCredit + lateFee) * 100) / 100);
+
+  const netRemainingInstallmentUsd = Math.round((totalInstallmentAmountUsd - (defaultingMembersCount * originalPerMemberInstallmentUsd) + absorbedDefaultAmountUsd) * 100) / 100;
+  const reallocatedPerMemberInstallmentUsd = Math.round((netRemainingInstallmentUsd / remainingActiveMembersCount) * 100) / 100;
+
+  let installmentStatusTier = 'DEFAULT_FULLY_OFFSET_BY_DEPOSIT';
+  if (absorbedDefaultAmountUsd > 0) {
+    installmentStatusTier = 'REALLOCATED_SHARE_INCREASED';
+  } else if (defaultingMembersCount === 0) {
+    installmentStatusTier = 'NO_MEMBER_DEFAULT';
+  }
+
+  return {
+    valid: true,
+    totalInstallmentAmountUsd,
+    originalActiveMembersCount,
+    defaultingMembersCount,
+    remainingActiveMembersCount,
+    originalPerMemberInstallmentUsd,
+    absorbedDefaultAmountUsd,
+    netRemainingInstallmentUsd,
+    reallocatedPerMemberInstallmentUsd,
+    installmentStatusTier,
+    recommendation: defaultingMembersCount === 0
+      ? `No default. ${originalActiveMembersCount} members pay $${originalPerMemberInstallmentUsd.toFixed(2)}/person.`
+      : installmentStatusTier === 'DEFAULT_FULLY_OFFSET_BY_DEPOSIT'
+      ? `Default by ${defaultingMembersCount} member(s) fully offset by forfeited deposit. Remaining ${remainingActiveMembersCount} members pay $${reallocatedPerMemberInstallmentUsd.toFixed(2)}/person.`
+      : `Default reallocation: ${defaultingMembersCount} member(s) defaulted. Remaining ${remainingActiveMembersCount} members absorb $${absorbedDefaultAmountUsd.toFixed(2)} ($${reallocatedPerMemberInstallmentUsd.toFixed(2)}/person).`
+  };
+}
+
 
 
 
