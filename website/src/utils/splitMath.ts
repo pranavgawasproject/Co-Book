@@ -3125,6 +3125,71 @@ export function calculateGroupBookingFareDisputeSettlement({
   };
 }
 
+export function calculateGroupTripRealtimePresenceAndCursorSyncScore({
+  connectedMembersCount = 4,
+  totalGroupMembers = 4,
+  averageLatencyMs = 45,
+  pendingSelectionsCount = 0
+}: {
+  connectedMembersCount?: number;
+  totalGroupMembers?: number;
+  averageLatencyMs?: number;
+  pendingSelectionsCount?: number;
+} = {}): {
+  valid: boolean;
+  connectedMembersCount: number;
+  totalGroupMembers: number;
+  presencePercentage: number;
+  averageLatencyMs: number;
+  syncScore: number;
+  syncTier: string;
+  recommendation: string;
+  error?: string;
+} {
+  if (typeof connectedMembersCount !== 'number' || connectedMembersCount < 0 ||
+      typeof totalGroupMembers !== 'number' || totalGroupMembers <= 0) {
+    return {
+      valid: false,
+      connectedMembersCount: 0,
+      totalGroupMembers: 0,
+      presencePercentage: 0,
+      averageLatencyMs: 0,
+      syncScore: 0,
+      syncTier: 'INVALID_INPUT',
+      recommendation: '',
+      error: 'Connected members and total group members must be positive numbers'
+    };
+  }
+
+  const presencePercentage = Math.round((Math.min(connectedMembersCount, totalGroupMembers) / totalGroupMembers) * 100);
+  let syncScore = presencePercentage;
+
+  if (averageLatencyMs > 200) syncScore -= 20;
+  else if (averageLatencyMs > 100) syncScore -= 10;
+
+  if (pendingSelectionsCount > 0) syncScore -= Math.min(20, pendingSelectionsCount * 5);
+
+  syncScore = Math.max(0, Math.min(100, Math.round(syncScore)));
+
+  let syncTier = 'HIGHLY_SYNCHRONIZED';
+  if (syncScore < 60) syncTier = 'POOR_PRESENCE_DISCONNECTED';
+  else if (syncScore < 85) syncTier = 'MODERATE_LATENCY_LAG';
+
+  return {
+    valid: true,
+    connectedMembersCount,
+    totalGroupMembers,
+    presencePercentage,
+    averageLatencyMs,
+    syncScore,
+    syncTier,
+    recommendation: syncScore >= 85
+      ? `Realtime session is highly synchronized (${presencePercentage}% active presence, ${averageLatencyMs}ms latency). Ready for group checkout.`
+      : `Warning: Multiplayer sync latency or absent members detected (${syncScore}/100 score).`
+  };
+}
+
+
 
 
 

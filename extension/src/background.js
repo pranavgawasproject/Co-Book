@@ -3,7 +3,6 @@
 // for chrome.storage access from content scripts.
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[SplitSync] Extension installed.');
 });
 
 // Keep the service worker alive by responding to messages from content scripts

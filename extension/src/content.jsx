@@ -26,7 +26,6 @@ if (!document.getElementById('splitsync-extension-root')) {
   const root = createRoot(renderRoot);
   root.render(<Hero />);
   
-  console.log('[SplitSync] Multiplayer UI Locked & Loaded via Shadow DOM');
 
   // 5. native Checkout Hijack
   // Intercepting clicks at the capture phase to block the host site's native checkout sequence
@@ -45,7 +44,6 @@ if (!document.getElementById('splitsync-extension-root')) {
         const event = new CustomEvent('splitsync-checkout-intercepted');
         window.dispatchEvent(event);
 
-        console.log('[SplitSync] Intercepted native checkout. Group must be fully funded to proceed.');
         // In a full build, we would disable the underlying button and change its text to "Locked by SplitSync"
         checkoutBtn.style.opacity = '0.5';
         checkoutBtn.style.cursor = 'not-allowed';

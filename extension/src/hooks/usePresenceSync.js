@@ -19,7 +19,6 @@ export function usePresenceSync(sessionId, userProfile) {
     const userName = userProfile.name || 'Anonymous';
     const userColor = getUserColor(userId);
 
-    console.log('[usePresenceSync] 🔌 Connecting Realtime for session:', sessionId);
 
     const channel = supabase.channel(`presence_${sessionId}`, {
       config: {

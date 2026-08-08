@@ -62,7 +62,8 @@ import {
   calculateCoBookGroupTravelExpenseReconciliationScore,
   calculateCoBookGroupFlightItineraryAlignmentScore,
   calculateGroupTripItineraryFeasibilityIndex,
-  calculateGroupBookingFareDisputeSettlement
+  calculateGroupBookingFareDisputeSettlement,
+  calculateGroupTripRealtimePresenceAndCursorSyncScore
 } from '../splitMath';
 
 
@@ -1429,7 +1430,29 @@ describe('Co-Book Split Math Utility', () => {
       expect(inv.error).toBe('Total booking cost must be a positive number');
     });
   });
+
+  describe('calculateGroupTripRealtimePresenceAndCursorSyncScore', () => {
+    test('calculates high synchronization score for fully connected group', () => {
+      const res = calculateGroupTripRealtimePresenceAndCursorSyncScore({
+        connectedMembersCount: 4,
+        totalGroupMembers: 4,
+        averageLatencyMs: 40,
+        pendingSelectionsCount: 0
+      });
+      expect(res.valid).toBe(true);
+      expect(res.presencePercentage).toBe(100);
+      expect(res.syncScore).toBe(100);
+      expect(res.syncTier).toBe('HIGHLY_SYNCHRONIZED');
+    });
+
+    test('returns error for invalid non-positive total group members', () => {
+      const inv = calculateGroupTripRealtimePresenceAndCursorSyncScore({ totalGroupMembers: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Connected members and total group members must be positive numbers');
+    });
+  });
 });
+
 
 
 
