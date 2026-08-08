@@ -3257,6 +3257,71 @@ export function calculateCoBookGroupTravelHoldLockEscrowAllocation({
   };
 }
 
+export function calculateCoBookGroupExpenseDisputeSettlementMatrix({
+  disputedAmountUsd = 200,
+  claimingMemberName = 'Alice',
+  contestingMembersCount = 3,
+  acceptedCompromisePct = 50,
+  hasReceiptEvidence = true
+}: {
+  disputedAmountUsd?: number;
+  claimingMemberName?: string;
+  contestingMembersCount?: number;
+  acceptedCompromisePct?: number;
+  hasReceiptEvidence?: boolean;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  disputedAmountUsd?: number;
+  claimingMemberName?: string;
+  contestingMembersCount?: number;
+  acceptedCompromisePct?: number;
+  hasReceiptEvidence?: boolean;
+  settlementClaimantShareUsd?: number;
+  settlementGroupProratedShareUsd?: number;
+  perContestingMemberShareUsd?: number;
+  resolutionTier?: string;
+  recommendation?: string;
+} {
+  if (typeof disputedAmountUsd !== 'number' || disputedAmountUsd <= 0) {
+    return { valid: false, error: 'Disputed amount must be a positive number' };
+  }
+  if (typeof contestingMembersCount !== 'number' || contestingMembersCount <= 0) {
+    return { valid: false, error: 'Contesting members count must be a positive integer' };
+  }
+
+  const compromisePct = Math.max(0, Math.min(100, typeof acceptedCompromisePct === 'number' ? acceptedCompromisePct : 50));
+  const claimantPct = 100 - compromisePct;
+
+  const settlementClaimantShareUsd = Math.round((disputedAmountUsd * (claimantPct / 100)) * 100) / 100;
+  const settlementGroupProratedShareUsd = Math.round((disputedAmountUsd * (compromisePct / 100)) * 100) / 100;
+  const perContestingMemberShareUsd = Math.round((settlementGroupProratedShareUsd / contestingMembersCount) * 100) / 100;
+
+  let resolutionTier = 'RESOLVED_FAIR_COMPROMISE';
+  if (!hasReceiptEvidence) {
+    resolutionTier = 'UNVERIFIED_EVIDENCE_HIGH_DISPUTE_RISK';
+  } else if (compromisePct === 50) {
+    resolutionTier = 'RESOLVED_EQUAL_50_50_SPLIT';
+  }
+
+  return {
+    valid: true,
+    disputedAmountUsd,
+    claimingMemberName,
+    contestingMembersCount,
+    acceptedCompromisePct: compromisePct,
+    hasReceiptEvidence,
+    settlementClaimantShareUsd,
+    settlementGroupProratedShareUsd,
+    perContestingMemberShareUsd,
+    resolutionTier,
+    recommendation: resolutionTier === 'UNVERIFIED_EVIDENCE_HIGH_DISPUTE_RISK'
+      ? `Missing receipt proof for $${disputedAmountUsd.toFixed(2)} dispute by ${claimingMemberName}. Upload proof of payment.`
+      : `Dispute settlement calculated: ${claimingMemberName} absorbs $${settlementClaimantShareUsd.toFixed(2)}, remaining $${settlementGroupProratedShareUsd.toFixed(2)} split across ${contestingMembersCount} members ($${perContestingMemberShareUsd.toFixed(2)}/person).`
+  };
+}
+
+
 
 
 

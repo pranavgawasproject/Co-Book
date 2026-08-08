@@ -64,7 +64,8 @@ import {
   calculateGroupTripItineraryFeasibilityIndex,
   calculateGroupBookingFareDisputeSettlement,
   calculateGroupTripRealtimePresenceAndCursorSyncScore,
-  calculateCoBookGroupTravelHoldLockEscrowAllocation
+  calculateCoBookGroupTravelHoldLockEscrowAllocation,
+  calculateCoBookGroupExpenseDisputeSettlementMatrix
 } from '../splitMath';
 
 
@@ -1479,6 +1480,33 @@ describe('Co-Book Split Math Utility', () => {
       const invMembers = calculateCoBookGroupTravelHoldLockEscrowAllocation({ groupMembersCount: 0 });
       expect(invMembers.valid).toBe(false);
       expect(invMembers.error).toBe('Group members count must be a positive integer');
+    });
+  });
+
+  describe('calculateCoBookGroupExpenseDisputeSettlementMatrix', () => {
+    test('calculates 50/50 compromise settlement breakdown', () => {
+      const res = calculateCoBookGroupExpenseDisputeSettlementMatrix({
+        disputedAmountUsd: 200,
+        claimingMemberName: 'Alice',
+        contestingMembersCount: 4,
+        acceptedCompromisePct: 50
+      });
+
+      expect(res.valid).toBe(true);
+      expect(res.settlementClaimantShareUsd).toBe(100);
+      expect(res.settlementGroupProratedShareUsd).toBe(100);
+      expect(res.perContestingMemberShareUsd).toBe(25);
+      expect(res.resolutionTier).toBe('RESOLVED_EQUAL_50_50_SPLIT');
+    });
+
+    test('returns error for invalid disputed amount or contesting members count', () => {
+      const inv = calculateCoBookGroupExpenseDisputeSettlementMatrix({ disputedAmountUsd: -50 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Disputed amount must be a positive number');
+
+      const invMembers = calculateCoBookGroupExpenseDisputeSettlementMatrix({ contestingMembersCount: 0 });
+      expect(invMembers.valid).toBe(false);
+      expect(invMembers.error).toBe('Contesting members count must be a positive integer');
     });
   });
 });
