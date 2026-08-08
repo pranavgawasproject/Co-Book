@@ -3189,6 +3189,75 @@ export function calculateGroupTripRealtimePresenceAndCursorSyncScore({
   };
 }
 
+export function calculateCoBookGroupTravelHoldLockEscrowAllocation({
+  totalBookingPriceUsd = 1600,
+  holdLockFeeUsd = 80,
+  groupMembersCount = 4,
+  holdExpiryHours = 24,
+  allowCancellationRefund = false
+}: {
+  totalBookingPriceUsd?: number;
+  holdLockFeeUsd?: number;
+  groupMembersCount?: number;
+  holdExpiryHours?: number;
+  allowCancellationRefund?: boolean;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalBookingPriceUsd?: number;
+  holdLockFeeUsd?: number;
+  groupMembersCount?: number;
+  perMemberHoldFeeUsd?: number;
+  perMemberTotalBookingShareUsd?: number;
+  cancellationPenaltyPerDropoutUsd?: number;
+  readinessScore?: number;
+  holdStatusTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalBookingPriceUsd !== 'number' || totalBookingPriceUsd <= 0) {
+    return { valid: false, error: 'Total booking price must be a positive number' };
+  }
+  if (typeof groupMembersCount !== 'number' || groupMembersCount <= 0) {
+    return { valid: false, error: 'Group members count must be a positive integer' };
+  }
+
+  const fee = typeof holdLockFeeUsd === 'number' && holdLockFeeUsd >= 0 ? holdLockFeeUsd : 0;
+  const expiry = typeof holdExpiryHours === 'number' && holdExpiryHours > 0 ? holdExpiryHours : 24;
+
+  const perMemberHoldFeeUsd = Math.round((fee / groupMembersCount) * 100) / 100;
+  const perMemberTotalBookingShareUsd = Math.round((totalBookingPriceUsd / groupMembersCount) * 100) / 100;
+  const cancellationPenaltyPerDropoutUsd = allowCancellationRefund ? 0 : perMemberHoldFeeUsd;
+
+  let score = 100;
+  if (fee > totalBookingPriceUsd * 0.15) score -= 25;
+  if (expiry < 12) score -= 20;
+
+  const readinessScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let holdStatusTier = 'OPTIMAL_FARE_HOLD';
+  if (readinessScore < 60) {
+    holdStatusTier = 'EXPIRING_HIGH_FEE_HOLD';
+  } else if (readinessScore < 85) {
+    holdStatusTier = 'MODERATE_HOLD_WINDOW';
+  }
+
+  return {
+    valid: true,
+    totalBookingPriceUsd,
+    holdLockFeeUsd: fee,
+    groupMembersCount,
+    perMemberHoldFeeUsd,
+    perMemberTotalBookingShareUsd,
+    cancellationPenaltyPerDropoutUsd,
+    readinessScore,
+    holdStatusTier,
+    recommendation: readinessScore >= 85
+      ? `Price hold locked! Each of ${groupMembersCount} members pays $${perMemberHoldFeeUsd.toFixed(2)} deposit ($${perMemberTotalBookingShareUsd.toFixed(2)} total share, ${expiry}h lock window).`
+      : `Short lock window or high fee (${expiry}h remaining). Prompt group members to complete payment.`
+  };
+}
+
+
 
 
 

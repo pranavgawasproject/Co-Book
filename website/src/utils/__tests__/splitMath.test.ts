@@ -63,8 +63,10 @@ import {
   calculateCoBookGroupFlightItineraryAlignmentScore,
   calculateGroupTripItineraryFeasibilityIndex,
   calculateGroupBookingFareDisputeSettlement,
-  calculateGroupTripRealtimePresenceAndCursorSyncScore
+  calculateGroupTripRealtimePresenceAndCursorSyncScore,
+  calculateCoBookGroupTravelHoldLockEscrowAllocation
 } from '../splitMath';
+
 
 
 
@@ -1451,7 +1453,36 @@ describe('Co-Book Split Math Utility', () => {
       expect(inv.error).toBe('Connected members and total group members must be positive numbers');
     });
   });
+
+  describe('calculateCoBookGroupTravelHoldLockEscrowAllocation', () => {
+    test('calculates hold fee deposit and total booking share per member', () => {
+      const res = calculateCoBookGroupTravelHoldLockEscrowAllocation({
+        totalBookingPriceUsd: 1600,
+        holdLockFeeUsd: 80,
+        groupMembersCount: 4,
+        holdExpiryHours: 24
+      });
+
+      expect(res.valid).toBe(true);
+      expect(res.perMemberHoldFeeUsd).toBe(20);
+      expect(res.perMemberTotalBookingShareUsd).toBe(400);
+      expect(res.readinessScore).toBe(100);
+      expect(res.holdStatusTier).toBe('OPTIMAL_FARE_HOLD');
+      expect(res.recommendation).toContain('Price hold locked!');
+    });
+
+    test('returns error for invalid non-positive total booking price or group members count', () => {
+      const inv = calculateCoBookGroupTravelHoldLockEscrowAllocation({ totalBookingPriceUsd: 0 });
+      expect(inv.valid).toBe(false);
+      expect(inv.error).toBe('Total booking price must be a positive number');
+
+      const invMembers = calculateCoBookGroupTravelHoldLockEscrowAllocation({ groupMembersCount: 0 });
+      expect(invMembers.valid).toBe(false);
+      expect(invMembers.error).toBe('Group members count must be a positive integer');
+    });
+  });
 });
+
 
 
 
