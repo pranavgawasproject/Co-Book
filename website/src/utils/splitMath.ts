@@ -3571,6 +3571,95 @@ export function calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit({
   };
 }
 
+export interface FxExpenseItem {
+  expenseId?: string;
+  baseCurrency?: string;
+  amountBase?: number;
+  targetCurrency?: string;
+  lockedFxRate?: number;
+  currentFxRate?: number;
+  settlementDateDaysOut?: number;
+}
+
+export function calculateCoBookGroupTravelFxHedgingAndVolatilityAudit({
+  bookingExpenses = [],
+  maxAllowedSlippagePercent = 2.0,
+  numberOfParticipants = 1
+}: {
+  bookingExpenses?: FxExpenseItem[];
+  maxAllowedSlippagePercent?: number;
+  numberOfParticipants?: number;
+} = {}) {
+  if (!Array.isArray(bookingExpenses) || bookingExpenses.length === 0) {
+    return {
+      valid: false,
+      error: 'Booking expenses list must be a non-empty array',
+      totalBaseAmount: 0,
+      totalCurrentTargetAmount: 0,
+      fxSlippageAmountUsd: 0,
+      fxSlippagePercentage: 0,
+      hedgingRiskTier: 'INELIGIBLE',
+      recommendedHedgingBufferUsd: 0,
+      perPersonAdjustedSettlementUsd: 0,
+      recommendation: 'Provide valid booking expenses to run FX hedging and volatility audit.'
+    };
+  }
+
+  const numPeople = typeof numberOfParticipants === 'number' && numberOfParticipants > 0 ? numberOfParticipants : 1;
+  const maxSlippage = typeof maxAllowedSlippagePercent === 'number' && maxAllowedSlippagePercent >= 0 ? maxAllowedSlippagePercent : 2.0;
+
+  let totalBaseAmount = 0;
+  let totalConvertedAtLocked = 0;
+  let totalConvertedAtCurrent = 0;
+
+  for (const exp of bookingExpenses) {
+    const baseAmt = typeof exp.amountBase === 'number' && !isNaN(exp.amountBase) && exp.amountBase > 0 ? exp.amountBase : 0;
+    const lockedRate = typeof exp.lockedFxRate === 'number' && exp.lockedFxRate > 0 ? exp.lockedFxRate : 1.0;
+    const currentRate = typeof exp.currentFxRate === 'number' && exp.currentFxRate > 0 ? exp.currentFxRate : lockedRate;
+
+    totalBaseAmount += baseAmt;
+    totalConvertedAtLocked += baseAmt * lockedRate;
+    totalConvertedAtCurrent += baseAmt * currentRate;
+  }
+
+  const fxSlippageAmountUsd = Math.round((totalConvertedAtCurrent - totalConvertedAtLocked) * 100) / 100;
+  const fxSlippagePercentage = totalConvertedAtLocked > 0 ? Math.round((fxSlippageAmountUsd / totalConvertedAtLocked) * 10000) / 100 : 0;
+
+  let hedgingRiskTier = 'LOW_FX_RISK';
+  let recommendedBufferPct = 0.01;
+
+  if (Math.abs(fxSlippagePercentage) > maxSlippage || fxSlippagePercentage > 5.0) {
+    hedgingRiskTier = 'HIGH_FX_RISK';
+    recommendedBufferPct = 0.05;
+  } else if (Math.abs(fxSlippagePercentage) > 1.0) {
+    hedgingRiskTier = 'MODERATE_FX_RISK';
+    recommendedBufferPct = 0.025;
+  }
+
+  const recommendedHedgingBufferUsd = Math.round(totalConvertedAtCurrent * recommendedBufferPct * 100) / 100;
+  const totalGroupSettlementUsd = Math.round((totalConvertedAtCurrent + recommendedHedgingBufferUsd) * 100) / 100;
+  const perPersonAdjustedSettlementUsd = Math.round((totalGroupSettlementUsd / numPeople) * 100) / 100;
+
+  return {
+    valid: true,
+    totalBaseAmount: Math.round(totalBaseAmount * 100) / 100,
+    totalConvertedAtLocked: Math.round(totalConvertedAtLocked * 100) / 100,
+    totalConvertedAtCurrent: Math.round(totalConvertedAtCurrent * 100) / 100,
+    fxSlippageAmountUsd,
+    fxSlippagePercentage,
+    hedgingRiskTier,
+    recommendedHedgingBufferUsd,
+    totalGroupSettlementUsd,
+    perPersonAdjustedSettlementUsd,
+    recommendation: hedgingRiskTier === 'HIGH_FX_RISK'
+      ? `High FX rate volatility detected (${fxSlippagePercentage.toFixed(2)}% slippage). Lock forward FX hedge or add $${recommendedHedgingBufferUsd.toFixed(2)} safety buffer ($${perPersonAdjustedSettlementUsd.toFixed(2)}/person total).`
+      : hedgingRiskTier === 'MODERATE_FX_RISK'
+      ? `Moderate FX movement (${fxSlippagePercentage.toFixed(2)}% slippage). Recommended $${recommendedHedgingBufferUsd.toFixed(2)} buffer attached to group escrow.`
+      : `FX exchange rates are stable within target tolerance (${fxSlippagePercentage.toFixed(2)}% variance).`
+  };
+}
+
+
 
 
 
