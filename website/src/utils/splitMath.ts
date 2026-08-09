@@ -3398,6 +3398,100 @@ export function calculateGroupTripInstallmentDefaultReallocation({
   };
 }
 
+export function calculateGroupHotelRoomOccupancyAndBedTaxAllocation({
+  rooms = [
+    { roomType: 'King Suite (Single Occupancy)', pricePerNightUsd: 200, occupantsCount: 1 },
+    { roomType: 'Double Queen (Double Occupancy)', pricePerNightUsd: 240, occupantsCount: 2 }
+  ],
+  totalNights = 3,
+  localBedTaxPerRoomNightUsd = 15,
+  resortFeePerNightUsd = 25
+}: {
+  rooms?: Array<{ roomType?: string; pricePerNightUsd?: number; occupantsCount?: number }>;
+  totalNights?: number;
+  localBedTaxPerRoomNightUsd?: number;
+  resortFeePerNightUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalNights?: number;
+  totalRoomsCount?: number;
+  totalOccupantsCount?: number;
+  totalBaseRoomCostUsd?: number;
+  totalBedTaxUsd?: number;
+  totalResortFeesUsd?: number;
+  grandTotalUsd?: number;
+  roomShares?: Array<{
+    roomType: string;
+    occupantsCount: number;
+    pricePerNightUsd: number;
+    roomTotalUsd: number;
+    perPersonTotalUsd: number;
+  }>;
+  allocationTier?: string;
+  recommendation?: string;
+} {
+  if (!Array.isArray(rooms) || rooms.length === 0) {
+    return { valid: false, error: 'Rooms list must be a non-empty array' };
+  }
+  if (typeof totalNights !== 'number' || totalNights <= 0 || !Number.isInteger(totalNights)) {
+    return { valid: false, error: 'Total nights must be a positive integer' };
+  }
+
+  const nights = totalNights;
+  const bedTaxPerNight = typeof localBedTaxPerRoomNightUsd === 'number' && localBedTaxPerRoomNightUsd >= 0 ? localBedTaxPerRoomNightUsd : 0;
+  const resortFeePerNight = typeof resortFeePerNightUsd === 'number' && resortFeePerNightUsd >= 0 ? resortFeePerNightUsd : 0;
+
+  let totalBaseRoomCostUsd = 0;
+  let totalOccupantsCount = 0;
+
+  const roomShares = rooms.map((r, idx) => {
+    const pricePerNight = typeof r.pricePerNightUsd === 'number' && r.pricePerNightUsd > 0 ? r.pricePerNightUsd : 0;
+    const occupants = typeof r.occupantsCount === 'number' && r.occupantsCount > 0 ? Math.floor(r.occupantsCount) : 1;
+    totalOccupantsCount += occupants;
+
+    const baseRoomCost = pricePerNight * nights;
+    const roomTaxAndFees = (bedTaxPerNight + resortFeePerNight) * nights;
+    const roomTotalUsd = Math.round((baseRoomCost + roomTaxAndFees) * 100) / 100;
+    totalBaseRoomCostUsd += baseRoomCost;
+
+    const perPersonTotalUsd = Math.round((roomTotalUsd / occupants) * 100) / 100;
+
+    return {
+      roomType: r.roomType || `Room #${idx + 1}`,
+      occupantsCount: occupants,
+      pricePerNightUsd: pricePerNight,
+      roomTotalUsd,
+      perPersonTotalUsd
+    };
+  });
+
+  const totalRoomsCount = rooms.length;
+  const totalBedTaxUsd = Math.round((bedTaxPerNight * totalRoomsCount * nights) * 100) / 100;
+  const totalResortFeesUsd = Math.round((resortFeePerNight * totalRoomsCount * nights) * 100) / 100;
+  const grandTotalUsd = Math.round((totalBaseRoomCostUsd + totalBedTaxUsd + totalResortFeesUsd) * 100) / 100;
+
+  let allocationTier = 'FAIR_PER_ROOM_OCCUPANCY_SPLIT';
+  if (totalRoomsCount > 1 && new Set(roomShares.map(s => s.perPersonTotalUsd)).size > 1) {
+    allocationTier = 'TIERED_ROOM_PREMIUM_ALLOCATION';
+  }
+
+  return {
+    valid: true,
+    totalNights: nights,
+    totalRoomsCount,
+    totalOccupantsCount,
+    totalBaseRoomCostUsd: Math.round(totalBaseRoomCostUsd * 100) / 100,
+    totalBedTaxUsd,
+    totalResortFeesUsd,
+    grandTotalUsd,
+    roomShares,
+    allocationTier,
+    recommendation: `Hotel booking ($${grandTotalUsd.toFixed(2)} total across ${totalRoomsCount} rooms for ${nights} nights) allocated fairly by room occupancy and bed tax.`
+  };
+}
+
+
 
 
 
