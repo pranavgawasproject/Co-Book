@@ -66,7 +66,8 @@ import {
   calculateGroupTripRealtimePresenceAndCursorSyncScore,
   calculateCoBookGroupTravelHoldLockEscrowAllocation,
   calculateCoBookGroupExpenseDisputeSettlementMatrix,
-  calculateGroupTripInstallmentDefaultReallocation
+  calculateGroupTripInstallmentDefaultReallocation,
+  calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit
 } from '../splitMath';
 
 
@@ -1555,7 +1556,37 @@ describe('Co-Book Split Math Utility', () => {
       expect(invDef.error).toBe('Defaulting members cannot equal or exceed total group size');
     });
   });
+
+  describe('calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit', () => {
+    test('calculates secure escrow protected allocation correctly', () => {
+      const res = calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit({
+        totalFlightCostUsd: 1200,
+        totalLodgingDepositUsd: 400,
+        groupMembersCount: 4,
+        isDepositRefundable: true,
+        cancellationProtectionRiderUsd: 40
+      });
+
+      expect(res.valid).toBe(true);
+      expect(res.perMemberFlightShareUsd).toBe(300);
+      expect(res.perMemberDepositShareUsd).toBe(100);
+      expect(res.perMemberTotalOutlayUsd).toBe(410);
+      expect(res.totalGroupOutlayUsd).toBe(1640);
+      expect(res.escrowStatusTier).toBe('SECURE_ESCROW_PROTECTED');
+    });
+
+    test('returns error for invalid non-positive flight cost or zero group members', () => {
+      const invFlight = calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit({ totalFlightCostUsd: -50 });
+      expect(invFlight.valid).toBe(false);
+      expect(invFlight.error).toBe('Total flight cost must be a positive number');
+
+      const invMembers = calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit({ groupMembersCount: 0 });
+      expect(invMembers.valid).toBe(false);
+      expect(invMembers.error).toBe('Group members count must be a positive integer');
+    });
+  });
 });
+
 
 
 

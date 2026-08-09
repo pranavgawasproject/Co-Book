@@ -3491,6 +3491,87 @@ export function calculateGroupHotelRoomOccupancyAndBedTaxAllocation({
   };
 }
 
+export function calculateCoBookGroupFlightAndLodgingSecurityDepositEscrowAudit({
+  totalFlightCostUsd = 1200,
+  totalLodgingDepositUsd = 400,
+  groupMembersCount = 4,
+  isDepositRefundable = true,
+  cancellationProtectionRiderUsd = 40
+}: {
+  totalFlightCostUsd?: number;
+  totalLodgingDepositUsd?: number;
+  groupMembersCount?: number;
+  isDepositRefundable?: boolean;
+  cancellationProtectionRiderUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalFlightCostUsd?: number;
+  totalLodgingDepositUsd?: number;
+  groupMembersCount?: number;
+  isDepositRefundable?: boolean;
+  cancellationProtectionRiderUsd?: number;
+  perMemberFlightShareUsd?: number;
+  perMemberDepositShareUsd?: number;
+  perMemberTotalOutlayUsd?: number;
+  totalGroupOutlayUsd?: number;
+  escrowSecurityScore?: number;
+  escrowStatusTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalFlightCostUsd !== 'number' || totalFlightCostUsd <= 0) {
+    return { valid: false, error: 'Total flight cost must be a positive number' };
+  }
+  if (typeof totalLodgingDepositUsd !== 'number' || totalLodgingDepositUsd < 0) {
+    return { valid: false, error: 'Total lodging deposit must be a non-negative number' };
+  }
+  if (typeof groupMembersCount !== 'number' || groupMembersCount <= 0 || !Number.isInteger(groupMembersCount)) {
+    return { valid: false, error: 'Group members count must be a positive integer' };
+  }
+
+  const rider = typeof cancellationProtectionRiderUsd === 'number' && cancellationProtectionRiderUsd >= 0 ? cancellationProtectionRiderUsd : 0;
+  const perMemberFlightShareUsd = Math.round((totalFlightCostUsd / groupMembersCount) * 100) / 100;
+  const perMemberDepositShareUsd = Math.round((totalLodgingDepositUsd / groupMembersCount) * 100) / 100;
+  const perMemberRiderShareUsd = Math.round((rider / groupMembersCount) * 100) / 100;
+
+  const perMemberTotalOutlayUsd = Math.round((perMemberFlightShareUsd + perMemberDepositShareUsd + perMemberRiderShareUsd) * 100) / 100;
+  const totalGroupOutlayUsd = Math.round((totalFlightCostUsd + totalLodgingDepositUsd + rider) * 100) / 100;
+
+  let score = 100;
+  if (!isDepositRefundable) score -= 35;
+  if (rider === 0) score -= 20;
+
+  const escrowSecurityScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let escrowStatusTier = 'SECURE_ESCROW_PROTECTED';
+  if (escrowSecurityScore < 60) {
+    escrowStatusTier = 'UNPROTECTED_DEPOSIT_RISK';
+  } else if (escrowSecurityScore < 85) {
+    escrowStatusTier = 'PARTIAL_PROTECTION_NO_RIDER';
+  }
+
+  return {
+    valid: true,
+    totalFlightCostUsd,
+    totalLodgingDepositUsd,
+    groupMembersCount,
+    isDepositRefundable: Boolean(isDepositRefundable),
+    cancellationProtectionRiderUsd: rider,
+    perMemberFlightShareUsd,
+    perMemberDepositShareUsd,
+    perMemberTotalOutlayUsd,
+    totalGroupOutlayUsd,
+    escrowSecurityScore,
+    escrowStatusTier,
+    recommendation: escrowStatusTier === 'SECURE_ESCROW_PROTECTED'
+      ? `Escrow fully secured! ${groupMembersCount} members pay $${perMemberTotalOutlayUsd.toFixed(2)}/person ($${perMemberDepositShareUsd.toFixed(2)} deposit, refundable with cancellation protection).`
+      : escrowStatusTier === 'PARTIAL_PROTECTION_NO_RIDER'
+      ? `Deposit is refundable, but no cancellation protection rider attached. Add $${rider || 40} rider for full group refund safeguard.`
+      : `Warning: Non-refundable deposit ($${totalLodgingDepositUsd.toFixed(2)}) without cancellation protection rider.`
+  };
+}
+
+
 
 
 
