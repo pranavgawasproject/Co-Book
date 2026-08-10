@@ -3821,6 +3821,125 @@ export function calculateGroupCarRentalAndVehicleInsuranceTaxSplit({
   };
 }
 
+export function calculateGroupTravelBaggageAndAuxiliaryFeeSplit({
+  participantsBaggageList = [
+    { name: 'Alice', checkedBagsCount: 2, carryOnBagsCount: 1, hasSportsEquipment: false },
+    { name: 'Bob', checkedBagsCount: 1, carryOnBagsCount: 1, hasSportsEquipment: false },
+    { name: 'Charlie', checkedBagsCount: 0, carryOnBagsCount: 1, hasSportsEquipment: true }
+  ],
+  firstCheckedBagFeeUsd = 35.0,
+  secondCheckedBagFeeUsd = 45.0,
+  sportsEquipmentFeeUsd = 75.0,
+  seatSelectionFeePerPersonUsd = 20.0
+}: {
+  participantsBaggageList?: Array<{
+    name?: string;
+    checkedBagsCount?: number;
+    carryOnBagsCount?: number;
+    hasSportsEquipment?: boolean;
+  }>;
+  firstCheckedBagFeeUsd?: number;
+  secondCheckedBagFeeUsd?: number;
+  sportsEquipmentFeeUsd?: number;
+  seatSelectionFeePerPersonUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalGroupBaggageFeeUsd?: number;
+  totalGroupSeatSelectionFeeUsd?: number;
+  grandTotalAuxiliaryFeesUsd?: number;
+  participantsCount?: number;
+  participantBreakdown?: Array<{
+    name: string;
+    checkedBagsCount: number;
+    checkedBaggageCostUsd: number;
+    sportsEquipmentCostUsd: number;
+    seatSelectionCostUsd: number;
+    totalAuxiliaryCostUsd: number;
+  }>;
+  groupPoolingSavingsUsd?: number;
+  optimizationTier?: string;
+  recommendation?: string;
+} {
+  if (!Array.isArray(participantsBaggageList) || participantsBaggageList.length === 0) {
+    return { valid: false, error: 'Participants baggage list must be a non-empty array' };
+  }
+
+  const bag1Fee = typeof firstCheckedBagFeeUsd === 'number' && firstCheckedBagFeeUsd >= 0 ? firstCheckedBagFeeUsd : 35.0;
+  const bag2Fee = typeof secondCheckedBagFeeUsd === 'number' && secondCheckedBagFeeUsd >= 0 ? secondCheckedBagFeeUsd : 45.0;
+  const sportsFee = typeof sportsEquipmentFeeUsd === 'number' && sportsEquipmentFeeUsd >= 0 ? sportsEquipmentFeeUsd : 75.0;
+  const seatFee = typeof seatSelectionFeePerPersonUsd === 'number' && seatSelectionFeePerPersonUsd >= 0 ? seatSelectionFeePerPersonUsd : 0;
+
+  let totalGroupBaggageFeeUsd = 0;
+  let totalGroupSeatSelectionFeeUsd = 0;
+  let heavyBaggageCount = 0;
+
+  const participantBreakdown = participantsBaggageList.map(p => {
+    const name = p.name || 'Anonymous';
+    const checkedCount = typeof p.checkedBagsCount === 'number' && p.checkedBagsCount > 0 ? Math.floor(p.checkedBagsCount) : 0;
+    const hasSports = Boolean(p.hasSportsEquipment);
+
+    let checkedBaggageCostUsd = 0;
+    if (checkedCount >= 1) checkedBaggageCostUsd += bag1Fee;
+    if (checkedCount >= 2) checkedBaggageCostUsd += (checkedCount - 1) * bag2Fee;
+
+    if (checkedCount > 1) heavyBaggageCount++;
+
+    const sportsEquipmentCostUsd = hasSports ? sportsFee : 0;
+    const seatSelectionCostUsd = seatFee;
+
+    const totalAuxiliaryCostUsd = Math.round((checkedBaggageCostUsd + sportsEquipmentCostUsd + seatSelectionCostUsd) * 100) / 100;
+    totalGroupBaggageFeeUsd += checkedBaggageCostUsd + sportsEquipmentCostUsd;
+    totalGroupSeatSelectionFeeUsd += seatSelectionCostUsd;
+
+    return {
+      name,
+      checkedBagsCount: checkedCount,
+      checkedBaggageCostUsd: Math.round(checkedBaggageCostUsd * 100) / 100,
+      sportsEquipmentCostUsd: Math.round(sportsEquipmentCostUsd * 100) / 100,
+      seatSelectionCostUsd: Math.round(seatSelectionCostUsd * 100) / 100,
+      totalAuxiliaryCostUsd
+    };
+  });
+
+  totalGroupBaggageFeeUsd = Math.round(totalGroupBaggageFeeUsd * 100) / 100;
+  totalGroupSeatSelectionFeeUsd = Math.round(totalGroupSeatSelectionFeeUsd * 100) / 100;
+  const grandTotalAuxiliaryFeesUsd = Math.round((totalGroupBaggageFeeUsd + totalGroupSeatSelectionFeeUsd) * 100) / 100;
+
+  let groupPoolingSavingsUsd = 0;
+  if (heavyBaggageCount > 0) {
+    const unpooledCost = participantBreakdown.reduce((acc, p) => acc + p.totalAuxiliaryCostUsd, 0);
+    const pooledBaggageCost = participantBreakdown.length * bag1Fee;
+    if (totalGroupBaggageFeeUsd > pooledBaggageCost) {
+      groupPoolingSavingsUsd = Math.round((totalGroupBaggageFeeUsd - pooledBaggageCost) * 100) / 100;
+    }
+  }
+
+  let optimizationTier = 'OPTIMIZED_SINGLE_BAG_ALLOCATION';
+  if (groupPoolingSavingsUsd > 0) {
+    optimizationTier = 'BAGGAGE_POOLING_SAVINGS_OPPORTUNITY';
+  } else if (totalGroupBaggageFeeUsd === 0) {
+    optimizationTier = 'CARRY_ON_ONLY_NO_BAGGAGE_FEES';
+  }
+
+  return {
+    valid: true,
+    totalGroupBaggageFeeUsd,
+    totalGroupSeatSelectionFeeUsd,
+    grandTotalAuxiliaryFeesUsd,
+    participantsCount: participantsBaggageList.length,
+    participantBreakdown,
+    groupPoolingSavingsUsd,
+    optimizationTier,
+    recommendation: optimizationTier === 'BAGGAGE_POOLING_SAVINGS_OPPORTUNITY'
+      ? `Baggage optimization opportunity: Pool 2nd checked bags across members with free capacity to save ~$${groupPoolingSavingsUsd.toFixed(2)}.`
+      : optimizationTier === 'CARRY_ON_ONLY_NO_BAGGAGE_FEES'
+      ? `All participants using carry-on bags only! $0 checked baggage fees.`
+      : `Flight auxiliary fees allocated ($${grandTotalAuxiliaryFeesUsd.toFixed(2)} total across ${participantsBaggageList.length} members).`
+  };
+}
+
+
 
 
 
