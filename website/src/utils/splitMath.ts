@@ -3659,6 +3659,86 @@ export function calculateCoBookGroupTravelFxHedgingAndVolatilityAudit({
   };
 }
 
+export function calculateGroupTripCancellationInsuranceAndRefundAllocation({
+  totalBookingCostUsd = 2000,
+  insuranceCoverageCapUsd = 1600,
+  cancellationPenaltyPct = 20,
+  groupMembersCount = 4,
+  droppingOutMembersCount = 1,
+  insurancePolicyPremiumUsd = 100
+}: {
+  totalBookingCostUsd?: number;
+  insuranceCoverageCapUsd?: number;
+  cancellationPenaltyPct?: number;
+  groupMembersCount?: number;
+  droppingOutMembersCount?: number;
+  insurancePolicyPremiumUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalBookingCostUsd?: number;
+  insuranceCoverageCapUsd?: number;
+  grossRefundAmountUsd?: number;
+  insurancePayoutUsd?: number;
+  netRefundPoolUsd?: number;
+  droppingMemberPenaltyUsd?: number;
+  remainingMemberRefundShareUsd?: number;
+  cancellationRiskTier?: string;
+  recommendation?: string;
+} {
+  if (typeof totalBookingCostUsd !== 'number' || totalBookingCostUsd <= 0) {
+    return { valid: false, error: 'Total booking cost must be a positive number' };
+  }
+  if (typeof groupMembersCount !== 'number' || groupMembersCount <= 0 || !Number.isInteger(groupMembersCount)) {
+    return { valid: false, error: 'Group members count must be a positive integer' };
+  }
+  if (typeof droppingOutMembersCount !== 'number' || droppingOutMembersCount < 0 || droppingOutMembersCount > groupMembersCount) {
+    return { valid: false, error: 'Dropping out members count cannot exceed total group members' };
+  }
+
+  const penaltyPct = Math.max(0, Math.min(100, typeof cancellationPenaltyPct === 'number' ? cancellationPenaltyPct : 20));
+  const coverageCap = typeof insuranceCoverageCapUsd === 'number' && insuranceCoverageCapUsd >= 0 ? insuranceCoverageCapUsd : 0;
+  const premium = typeof insurancePolicyPremiumUsd === 'number' && insurancePolicyPremiumUsd >= 0 ? insurancePolicyPremiumUsd : 0;
+
+  const grossRefundableAmount = Math.round((totalBookingCostUsd * ((100 - penaltyPct) / 100)) * 100) / 100;
+  const penaltyAmount = Math.round((totalBookingCostUsd * (penaltyPct / 100)) * 100) / 100;
+
+  const insurancePayoutUsd = Math.min(penaltyAmount, coverageCap);
+  const netRefundPoolUsd = Math.round((grossRefundableAmount + insurancePayoutUsd - premium) * 100) / 100;
+
+  const droppingMemberPenaltyUsd = Math.round((penaltyAmount / groupMembersCount) * 100) / 100;
+  const remainingCount = groupMembersCount - droppingOutMembersCount;
+
+  const remainingMemberRefundShareUsd = remainingCount > 0
+    ? Math.round((netRefundPoolUsd / groupMembersCount) * 100) / 100
+    : 0;
+
+  let cancellationRiskTier = 'SECURE_INSURED_REFUND';
+  if (insurancePayoutUsd === 0 && penaltyPct > 30) {
+    cancellationRiskTier = 'CRITICAL_UNINSURED_LOSS';
+  } else if (insurancePayoutUsd < penaltyAmount) {
+    cancellationRiskTier = 'PARTIAL_FORFEITURE_WARNING';
+  }
+
+  return {
+    valid: true,
+    totalBookingCostUsd,
+    insuranceCoverageCapUsd: coverageCap,
+    grossRefundAmountUsd: grossRefundableAmount,
+    insurancePayoutUsd,
+    netRefundPoolUsd,
+    droppingMemberPenaltyUsd,
+    remainingMemberRefundShareUsd,
+    cancellationRiskTier,
+    recommendation: cancellationRiskTier === 'SECURE_INSURED_REFUND'
+      ? `Cancellation fully protected by insurance ($${insurancePayoutUsd.toFixed(2)} payout). Net refund pool: $${netRefundPoolUsd.toFixed(2)}.`
+      : cancellationRiskTier === 'PARTIAL_FORFEITURE_WARNING'
+      ? `Partial cancellation coverage: $${insurancePayoutUsd.toFixed(2)} insurance payout leaves $${(penaltyAmount - insurancePayoutUsd).toFixed(2)} unrecovered forfeiture penalty.`
+      : `Critical risk: Uninsured cancellation penalty ($${penaltyAmount.toFixed(2)} loss, ${penaltyPct}% forfeiture).`
+  };
+}
+
+
 
 
 
