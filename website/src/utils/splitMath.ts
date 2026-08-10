@@ -3738,6 +3738,90 @@ export function calculateGroupTripCancellationInsuranceAndRefundAllocation({
   };
 }
 
+export function calculateGroupCarRentalAndVehicleInsuranceTaxSplit({
+  rentalBaseCostUsd = 400,
+  insuranceCoverageCostUsd = 120,
+  designatedDriversCount = 2,
+  totalParticipantsCount = 4,
+  fuelTotalCostUsd = 80,
+  tollsTotalCostUsd = 40
+}: {
+  rentalBaseCostUsd?: number;
+  insuranceCoverageCostUsd?: number;
+  designatedDriversCount?: number;
+  totalParticipantsCount?: number;
+  fuelTotalCostUsd?: number;
+  tollsTotalCostUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  rentalBaseCostUsd?: number;
+  insuranceCoverageCostUsd?: number;
+  designatedDriversCount?: number;
+  totalParticipantsCount?: number;
+  fuelTotalCostUsd?: number;
+  tollsTotalCostUsd?: number;
+  totalVehicleExpensesUsd?: number;
+  perNonDriverShareUsd?: number;
+  perDriverShareUsd?: number;
+  driverInsuranceSurchargePerPersonUsd?: number;
+  splitEfficiencyScore?: number;
+  allocationTier?: string;
+  recommendation?: string;
+} {
+  if (typeof rentalBaseCostUsd !== 'number' || rentalBaseCostUsd <= 0) {
+    return { valid: false, error: 'Rental base cost must be a positive number' };
+  }
+  if (typeof totalParticipantsCount !== 'number' || totalParticipantsCount <= 0 || !Number.isInteger(totalParticipantsCount)) {
+    return { valid: false, error: 'Total participants count must be a positive integer' };
+  }
+  if (typeof designatedDriversCount !== 'number' || designatedDriversCount <= 0 || designatedDriversCount > totalParticipantsCount) {
+    return { valid: false, error: 'Designated drivers count must be a positive integer not exceeding total group size' };
+  }
+
+  const insurance = typeof insuranceCoverageCostUsd === 'number' && insuranceCoverageCostUsd >= 0 ? insuranceCoverageCostUsd : 0;
+  const fuel = typeof fuelTotalCostUsd === 'number' && fuelTotalCostUsd >= 0 ? fuelTotalCostUsd : 0;
+  const tolls = typeof tollsTotalCostUsd === 'number' && tollsTotalCostUsd >= 0 ? tollsTotalCostUsd : 0;
+
+  const equalSharedPoolUsd = rentalBaseCostUsd + fuel + tolls;
+  const perPersonSharedShareUsd = Math.round((equalSharedPoolUsd / totalParticipantsCount) * 100) / 100;
+  const driverInsuranceSurchargePerPersonUsd = Math.round((insurance / designatedDriversCount) * 100) / 100;
+
+  const perNonDriverShareUsd = perPersonSharedShareUsd;
+  const perDriverShareUsd = Math.round((perPersonSharedShareUsd + driverInsuranceSurchargePerPersonUsd) * 100) / 100;
+  const totalVehicleExpensesUsd = Math.round((equalSharedPoolUsd + insurance) * 100) / 100;
+
+  let score = 100;
+  if (insurance > rentalBaseCostUsd * 0.5) score -= 20;
+
+  const splitEfficiencyScore = Math.max(0, Math.min(100, Math.round(score)));
+
+  let allocationTier = 'EQUAL_DRIVER_SURCHARGE_ALLOCATION';
+  if (designatedDriversCount === totalParticipantsCount) {
+    allocationTier = 'FULL_GROUP_DRIVER_EQUAL_SPLIT';
+  }
+
+  return {
+    valid: true,
+    rentalBaseCostUsd,
+    insuranceCoverageCostUsd: insurance,
+    designatedDriversCount,
+    totalParticipantsCount,
+    fuelTotalCostUsd: fuel,
+    tollsTotalCostUsd: tolls,
+    totalVehicleExpensesUsd,
+    perNonDriverShareUsd,
+    perDriverShareUsd,
+    driverInsuranceSurchargePerPersonUsd,
+    splitEfficiencyScore,
+    allocationTier,
+    recommendation: allocationTier === 'FULL_GROUP_DRIVER_EQUAL_SPLIT'
+      ? `Car rental ($${totalVehicleExpensesUsd.toFixed(2)} total) split equally across all ${totalParticipantsCount} group drivers ($${perDriverShareUsd.toFixed(2)}/person).`
+      : `Car rental allocated: Non-drivers pay $${perNonDriverShareUsd.toFixed(2)}, while ${designatedDriversCount} designated driver(s) pay $${perDriverShareUsd.toFixed(2)} (includes $${driverInsuranceSurchargePerPersonUsd.toFixed(2)} driver insurance surcharge).`
+  };
+}
+
+
 
 
 
