@@ -4054,6 +4054,99 @@ export function calculateGroupTripEcoTaxAndCarbonOffsetAllocation({
   };
 }
 
+export function calculateGroupTransitAndSharedFlightSplit({
+  participantsList = [
+    { name: 'Alice', luggageCount: 2, optOutLegsCount: 0 },
+    { name: 'Bob', luggageCount: 1, optOutLegsCount: 0 },
+    { name: 'Charlie', luggageCount: 0, optOutLegsCount: 1 }
+  ],
+  charterBaseCostUsd = 1500,
+  fuelSurchargeUsd = 300,
+  landingAndAirportFeesUsd = 150,
+  totalLegsCount = 3
+}: {
+  participantsList?: Array<{
+    name: string;
+    luggageCount?: number;
+    optOutLegsCount?: number;
+  }>;
+  charterBaseCostUsd?: number;
+  fuelSurchargeUsd?: number;
+  landingAndAirportFeesUsd?: number;
+  totalLegsCount?: number;
+} = {}) {
+  if (!Array.isArray(participantsList) || participantsList.length === 0) {
+    return {
+      valid: false,
+      error: 'Participants list must be a non-empty array',
+      totalCharterCostUsd: 0,
+      totalFuelSurchargeUsd: 0,
+      totalLandingFeesUsd: 0,
+      grandTotalTransitExpenseUsd: 0,
+      participantBreakdown: [],
+      splitTier: 'NO_PARTICIPANTS_SUBMITTED',
+      recommendation: 'Provide valid participants list for shared flight split calculation.'
+    };
+  }
+
+  const numPeople = participantsList.length;
+  const baseCharter = typeof charterBaseCostUsd === 'number' && charterBaseCostUsd > 0 ? charterBaseCostUsd : 0;
+  const fuel = typeof fuelSurchargeUsd === 'number' && fuelSurchargeUsd >= 0 ? fuelSurchargeUsd : 0;
+  const fees = typeof landingAndAirportFeesUsd === 'number' && landingAndAirportFeesUsd >= 0 ? landingAndAirportFeesUsd : 0;
+  const legs = typeof totalLegsCount === 'number' && totalLegsCount > 0 ? totalLegsCount : 1;
+
+  const grandTotalTransitExpenseUsd = Math.round((baseCharter + fuel + fees) * 100) / 100;
+  const fixedPerPersonFeeUsd = fees / numPeople;
+
+  let totalWeightPoints = 0;
+  for (const p of participantsList) {
+    const lug = p.luggageCount || 0;
+    const optOuts = Math.min(legs - 1, p.optOutLegsCount || 0);
+    const activeLegsRatio = (legs - optOuts) / legs;
+    const weight = activeLegsRatio * (1 + lug * 0.1);
+    totalWeightPoints += weight;
+  }
+
+  const participantBreakdown = participantsList.map(p => {
+    const lug = p.luggageCount || 0;
+    const optOuts = Math.min(legs - 1, p.optOutLegsCount || 0);
+    const activeLegsRatio = (legs - optOuts) / legs;
+    const weight = activeLegsRatio * (1 + lug * 0.1);
+    const shareFraction = weight / (totalWeightPoints || 1);
+
+    const charterShareUsd = (baseCharter + fuel) * shareFraction;
+    const totalParticipantCostUsd = Math.round((charterShareUsd + fixedPerPersonFeeUsd) * 100) / 100;
+
+    return {
+      name: p.name,
+      luggageCount: lug,
+      activeLegsCount: legs - optOuts,
+      totalParticipantCostUsd
+    };
+  });
+
+  let splitTier = 'EQUAL_CHARTER_SPLIT';
+  const hasOptOuts = participantsList.some(p => (p.optOutLegsCount || 0) > 0);
+  if (hasOptOuts) {
+    splitTier = 'PRO_RATA_LEG_OPT_OUT_SPLIT';
+  }
+
+  return {
+    valid: true,
+    participantsCount: numPeople,
+    totalCharterCostUsd: Math.round(baseCharter * 100) / 100,
+    totalFuelSurchargeUsd: Math.round(fuel * 100) / 100,
+    totalLandingFeesUsd: Math.round(fees * 100) / 100,
+    grandTotalTransitExpenseUsd,
+    participantBreakdown,
+    splitTier,
+    recommendation: splitTier === 'PRO_RATA_LEG_OPT_OUT_SPLIT'
+      ? `Pro-rata transit split calculated: Grand total $${grandTotalTransitExpenseUsd.toFixed(2)} split across ${numPeople} members with leg opt-outs adjusted.`
+      : `Shared transit flight total $${grandTotalTransitExpenseUsd.toFixed(2)} allocated across ${numPeople} group members.`
+  };
+}
+
+
 
 
 
