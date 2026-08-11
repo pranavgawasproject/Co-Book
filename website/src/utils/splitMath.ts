@@ -3939,6 +3939,122 @@ export function calculateGroupTravelBaggageAndAuxiliaryFeeSplit({
   };
 }
 
+export function calculateGroupTripEcoTaxAndCarbonOffsetAllocation({
+  travelersList = [],
+  flightDistanceKm = 0,
+  lodgingNightsCount = 0,
+  vehicleDistanceKm = 0,
+  carbonOffsetRatePerTonUsd = 25,
+  destinationEcoTaxPerNightUsd = 3.5
+}: {
+  travelersList?: Array<{
+    name: string;
+    flightOptIn?: boolean;
+    flightClassMultiplier?: number;
+    lodgingShareFraction?: number;
+    vehicleShareFraction?: number;
+    voluntaryCarbonContributionUsd?: number;
+  }>;
+  flightDistanceKm?: number;
+  lodgingNightsCount?: number;
+  vehicleDistanceKm?: number;
+  carbonOffsetRatePerTonUsd?: number;
+  destinationEcoTaxPerNightUsd?: number;
+} = {}) {
+  if (!Array.isArray(travelersList) || travelersList.length === 0) {
+    return {
+      valid: false,
+      error: 'Empty or invalid travelers list provided for eco-tax calculation',
+      totalGroupEmissionsKgCo2: 0,
+      totalGroupCarbonOffsetCostUsd: 0,
+      totalDestinationEcoTaxUsd: 0,
+      grandTotalEcoFundUsd: 0,
+      sustainabilityTier: 'NO_TRAVELERS_SUBMITTED',
+      participantBreakdown: [],
+      recommendation: 'No group travelers submitted for eco-tax and carbon offset allocation.'
+    };
+  }
+
+  const numTravelers = travelersList.length;
+
+  const baseFlightEmissionsPerPersonKg = flightDistanceKm * 0.115;
+  const totalLodgingEmissionsKg = lodgingNightsCount * 12.5;
+  const totalVehicleEmissionsKg = vehicleDistanceKm * 0.170;
+
+  let totalGroupEmissionsKgCo2 = 0;
+  let totalGroupCarbonOffsetCostUsd = 0;
+  let totalDestinationEcoTaxUsd = 0;
+
+  const defaultLodgingFraction = 1 / numTravelers;
+  const defaultVehicleFraction = 1 / numTravelers;
+
+  const participantBreakdown = travelersList.map(t => {
+    const flightClassMult = t.flightClassMultiplier || 1.0;
+    const flightOptIn = t.flightOptIn !== false;
+    const personalFlightEmissionsKg = flightOptIn ? baseFlightEmissionsPerPersonKg * flightClassMult : 0;
+
+    const lodgingFrac = t.lodgingShareFraction || defaultLodgingFraction;
+    const personalLodgingEmissionsKg = totalLodgingEmissionsKg * lodgingFrac;
+
+    const vehicleFrac = t.vehicleShareFraction || defaultVehicleFraction;
+    const personalVehicleEmissionsKg = totalVehicleEmissionsKg * vehicleFrac;
+
+    const personalTotalEmissionsKg = Math.round((personalFlightEmissionsKg + personalLodgingEmissionsKg + personalVehicleEmissionsKg) * 100) / 100;
+    totalGroupEmissionsKgCo2 += personalTotalEmissionsKg;
+
+    const personalOffsetCostUsd = Math.round((personalTotalEmissionsKg / 1000) * carbonOffsetRatePerTonUsd * 100) / 100;
+    const voluntaryContributionUsd = parseFloat(String(t.voluntaryCarbonContributionUsd || 0)) || 0;
+
+    const totalEcoTaxForTrip = lodgingNightsCount * destinationEcoTaxPerNightUsd;
+    const personalEcoTaxUsd = Math.round(totalEcoTaxForTrip * lodgingFrac * 100) / 100;
+
+    totalGroupCarbonOffsetCostUsd += (personalOffsetCostUsd + voluntaryContributionUsd);
+    totalDestinationEcoTaxUsd += personalEcoTaxUsd;
+
+    const totalEcoCostUsd = Math.round((personalOffsetCostUsd + voluntaryContributionUsd + personalEcoTaxUsd) * 100) / 100;
+
+    return {
+      name: t.name,
+      personalTotalEmissionsKg,
+      personalOffsetCostUsd,
+      voluntaryContributionUsd,
+      personalEcoTaxUsd,
+      totalEcoCostUsd
+    };
+  });
+
+  totalGroupEmissionsKgCo2 = Math.round(totalGroupEmissionsKgCo2 * 100) / 100;
+  totalGroupCarbonOffsetCostUsd = Math.round(totalGroupCarbonOffsetCostUsd * 100) / 100;
+  totalDestinationEcoTaxUsd = Math.round(totalDestinationEcoTaxUsd * 100) / 100;
+  const grandTotalEcoFundUsd = Math.round((totalGroupCarbonOffsetCostUsd + totalDestinationEcoTaxUsd) * 100) / 100;
+
+  const avgEmissionsPerPerson = totalGroupEmissionsKgCo2 / numTravelers;
+
+  let sustainabilityTier = 'BALANCED_ECO_TRAVELERS';
+  if (avgEmissionsPerPerson < 150) {
+    sustainabilityTier = 'ECO_LEADER_LOW_CARBON';
+  } else if (avgEmissionsPerPerson > 500) {
+    sustainabilityTier = 'HIGH_CARBON_EMISSIONS_ALERT';
+  }
+
+  return {
+    valid: true,
+    travelersCount: numTravelers,
+    totalGroupEmissionsKgCo2,
+    totalGroupCarbonOffsetCostUsd,
+    totalDestinationEcoTaxUsd,
+    grandTotalEcoFundUsd,
+    sustainabilityTier,
+    participantBreakdown,
+    recommendation: sustainabilityTier === 'ECO_LEADER_LOW_CARBON'
+      ? `Eco leader travel status! Group total emissions is low at ${totalGroupEmissionsKgCo2.toFixed(1)} kg CO2e ($${grandTotalEcoFundUsd.toFixed(2)} total offset & eco-tax pool).`
+      : sustainabilityTier === 'HIGH_CARBON_EMISSIONS_ALERT'
+      ? `High carbon emissions alert: ${totalGroupEmissionsKgCo2.toFixed(1)} kg CO2e across group travel ($${grandTotalEcoFundUsd.toFixed(2)} recommended offset contribution).`
+      : `Group travel carbon footprint: ${totalGroupEmissionsKgCo2.toFixed(1)} kg CO2e allocated ($${grandTotalEcoFundUsd.toFixed(2)} total offset & eco-tax across ${numTravelers} members).`
+  };
+}
+
+
 
 
 
