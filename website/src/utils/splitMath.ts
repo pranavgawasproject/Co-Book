@@ -4146,6 +4146,93 @@ export function calculateGroupTransitAndSharedFlightSplit({
   };
 }
 
+export interface DamageDepositParticipant {
+  name: string;
+  depositShareUsd?: number;
+  roomDamageDeductionUsd?: number;
+}
+
+export interface DamageDepositParams {
+  totalDepositUsd?: number;
+  participantsList?: DamageDepositParticipant[];
+  merchantRefundedAmountUsd?: number;
+  fxConversionFeePct?: number;
+}
+
+export function calculateCoBookDamageDepositEscrowSplit(params: DamageDepositParams = {}) {
+  const {
+    totalDepositUsd = 0,
+    participantsList = [],
+    merchantRefundedAmountUsd = 0,
+    fxConversionFeePct = 0
+  } = params;
+
+  if (typeof totalDepositUsd !== 'number' || totalDepositUsd <= 0 || !Array.isArray(participantsList) || participantsList.length === 0) {
+    return {
+      valid: false,
+      error: 'Total deposit must be greater than zero and participants list must not be empty',
+      participantsCount: 0,
+      totalDepositUsd: 0,
+      netRefundedUsd: 0,
+      totalDeductionsUsd: 0,
+      participantRefundBreakdown: [],
+      splitTier: 'INVALID_INPUT',
+      recommendation: 'Provide valid deposit amount and participant list.'
+    };
+  }
+
+  const numPeople = participantsList.length;
+  const equalDepositShareUsd = Math.round((totalDepositUsd / numPeople) * 100) / 100;
+
+  const totalDamageDeductionsUsd = participantsList.reduce((sum, p) => sum + (p.roomDamageDeductionUsd || 0), 0);
+  const fxFeeDeductionUsd = Math.round((totalDepositUsd * (fxConversionFeePct / 100)) * 100) / 100;
+
+  const netRefundedUsd = Math.round((merchantRefundedAmountUsd - fxFeeDeductionUsd) * 100) / 100;
+  const totalLossUsd = Math.round((totalDepositUsd - netRefundedUsd) * 100) / 100;
+
+  const participantRefundBreakdown = participantsList.map(p => {
+    const baseShare = p.depositShareUsd || equalDepositShareUsd;
+    const roomDamage = p.roomDamageDeductionUsd || 0;
+
+    const unexplainedLossUsd = Math.max(0, totalLossUsd - totalDamageDeductionsUsd);
+    const sharedLossPerPerson = Math.round((unexplainedLossUsd / numPeople) * 100) / 100;
+
+    const netRefundUsd = Math.max(0, Math.round((baseShare - roomDamage - sharedLossPerPerson) * 100) / 100);
+
+    return {
+      name: p.name,
+      depositShareUsd: baseShare,
+      roomDamageDeductionUsd: roomDamage,
+      sharedLossShareUsd: sharedLossPerPerson,
+      netRefundUsd
+    };
+  });
+
+  let splitTier = 'FULL_SECURITY_DEPOSIT_REFUND';
+  if (totalDamageDeductionsUsd > 0) {
+    splitTier = 'ITEMIZED_ROOM_DAMAGE_DEDUCTION';
+  } else if (totalLossUsd > 0) {
+    splitTier = 'FX_OR_PLATFORM_HOLDBACK_LOSS';
+  }
+
+  return {
+    valid: true,
+    participantsCount: numPeople,
+    totalDepositUsd: Math.round(totalDepositUsd * 100) / 100,
+    merchantRefundedAmountUsd: Math.round(merchantRefundedAmountUsd * 100) / 100,
+    netRefundedUsd,
+    totalDeductionsUsd: Math.round((totalDamageDeductionsUsd + fxFeeDeductionUsd) * 100) / 100,
+    participantRefundBreakdown,
+    splitTier,
+    recommendation: splitTier === 'FULL_SECURITY_DEPOSIT_REFUND'
+      ? `Full security deposit of $${totalDepositUsd.toFixed(2)} refunded equally among ${numPeople} members.`
+      : splitTier === 'ITEMIZED_ROOM_DAMAGE_DEDUCTION'
+      ? `Security deposit settlement: $${netRefundedUsd.toFixed(2)} refunded net of $${totalDamageDeductionsUsd.toFixed(2)} itemized damage deductions.`
+      : `Deposit settlement alert: $${totalLossUsd.toFixed(2)} platform holdback/FX loss prorated across group.`
+  };
+}
+
+
 
 
 
