@@ -4515,6 +4515,120 @@ export function calculateGroupVehicleFuelAndTollSplit(params: VehicleFuelAndToll
   };
 }
 
+export function calculateGroupBookingPriceLockEscrowSplit({
+  totalBookingPriceUsd = 2400,
+  optionLockFeePct = 5.0,
+  downPaymentDepositPct = 15.0,
+  membersList = [
+    { name: 'Alice', confirmedAndPaid: true },
+    { name: 'Bob', confirmedAndPaid: true },
+    { name: 'Charlie', confirmedAndPaid: false }
+  ],
+  priceLockWindowDays = 7
+}: {
+  totalBookingPriceUsd?: number;
+  optionLockFeePct?: number;
+  downPaymentDepositPct?: number;
+  membersList?: Array<{ name: string; confirmedAndPaid?: boolean }>;
+  priceLockWindowDays?: number;
+} = {}): {
+  valid: boolean;
+  totalBookingPriceUsd: number;
+  membersCount: number;
+  confirmedMembersCount: number;
+  unconfirmedMembersCount: number;
+  optionLockFeeTotalUsd: number;
+  perMemberOptionLockFeeUsd: number;
+  downPaymentDepositTotalUsd: number;
+  perMemberDownPaymentUsd: number;
+  totalEscrowRequiredUpfrontUsd: number;
+  paidEscrowCollectedUsd: number;
+  outstandingEscrowShortfallUsd: number;
+  isPriceLockFullyFunded: boolean;
+  escrowStatusTier: string;
+  recommendation: string;
+} {
+  const price = typeof totalBookingPriceUsd === 'number' && !isNaN(totalBookingPriceUsd) && totalBookingPriceUsd > 0 ? totalBookingPriceUsd : 0;
+  const members = Array.isArray(membersList) && membersList.length > 0 ? membersList : [];
+
+  if (price === 0 || members.length === 0) {
+    return {
+      valid: false,
+      totalBookingPriceUsd: 0,
+      membersCount: 0,
+      confirmedMembersCount: 0,
+      unconfirmedMembersCount: 0,
+      optionLockFeeTotalUsd: 0,
+      perMemberOptionLockFeeUsd: 0,
+      downPaymentDepositTotalUsd: 0,
+      perMemberDownPaymentUsd: 0,
+      totalEscrowRequiredUpfrontUsd: 0,
+      paidEscrowCollectedUsd: 0,
+      outstandingEscrowShortfallUsd: 0,
+      isPriceLockFullyFunded: false,
+      escrowStatusTier: 'INVALID_INPUT',
+      recommendation: 'Valid total booking price and non-empty members list required.'
+    };
+  }
+
+  const optPct = typeof optionLockFeePct === 'number' && !isNaN(optionLockFeePct) && optionLockFeePct >= 0 ? optionLockFeePct / 100 : 0.05;
+  const depPct = typeof downPaymentDepositPct === 'number' && !isNaN(downPaymentDepositPct) && downPaymentDepositPct >= 0 ? downPaymentDepositPct / 100 : 0.15;
+
+  const membersCount = members.length;
+  let confirmedMembersCount = 0;
+
+  for (const m of members) {
+    if (m.confirmedAndPaid !== false) {
+      confirmedMembersCount++;
+    }
+  }
+
+  const unconfirmedMembersCount = membersCount - confirmedMembersCount;
+
+  const optionLockFeeTotalUsd = Math.round(price * optPct * 100) / 100;
+  const perMemberOptionLockFeeUsd = Math.round((optionLockFeeTotalUsd / membersCount) * 100) / 100;
+
+  const downPaymentDepositTotalUsd = Math.round(price * depPct * 100) / 100;
+  const perMemberDownPaymentUsd = Math.round((downPaymentDepositTotalUsd / membersCount) * 100) / 100;
+
+  const perMemberEscrowTotalUsd = Math.round((perMemberOptionLockFeeUsd + perMemberDownPaymentUsd) * 100) / 100;
+  const totalEscrowRequiredUpfrontUsd = Math.round((perMemberEscrowTotalUsd * membersCount) * 100) / 100;
+
+  const paidEscrowCollectedUsd = Math.round((perMemberEscrowTotalUsd * confirmedMembersCount) * 100) / 100;
+  const outstandingEscrowShortfallUsd = Math.round(Math.max(0, totalEscrowRequiredUpfrontUsd - paidEscrowCollectedUsd) * 100) / 100;
+
+  const isPriceLockFullyFunded = unconfirmedMembersCount === 0;
+
+  let escrowStatusTier = 'PRICE_LOCK_FULLY_ESCROWED';
+  if (unconfirmedMembersCount > 0 && paidEscrowCollectedUsd >= downPaymentDepositTotalUsd) {
+    escrowStatusTier = 'DOWN_PAYMENT_COVERED_PENDING_FULL_MEMBER_LOCK';
+  } else if (unconfirmedMembersCount > 0) {
+    escrowStatusTier = 'PRICE_LOCK_ESCROW_SHORTFALL';
+  }
+
+  return {
+    valid: true,
+    totalBookingPriceUsd: price,
+    membersCount,
+    confirmedMembersCount,
+    unconfirmedMembersCount,
+    optionLockFeeTotalUsd,
+    perMemberOptionLockFeeUsd,
+    downPaymentDepositTotalUsd,
+    perMemberDownPaymentUsd,
+    totalEscrowRequiredUpfrontUsd,
+    paidEscrowCollectedUsd,
+    outstandingEscrowShortfallUsd,
+    isPriceLockFullyFunded,
+    escrowStatusTier,
+    recommendation: isPriceLockFullyFunded
+      ? `Price lock active! All ${membersCount} members fully paid upfront deposit ($${perMemberEscrowTotalUsd.toFixed(2)}/person for ${priceLockWindowDays}-day price lock).`
+      : escrowStatusTier === 'DOWN_PAYMENT_COVERED_PENDING_FULL_MEMBER_LOCK'
+      ? `Down payment covered ($${paidEscrowCollectedUsd.toFixed(2)} collected). ${unconfirmedMembersCount} member(s) pending ($${outstandingEscrowShortfallUsd.toFixed(2)} shortfall remaining).`
+      : `Price lock escrow shortfall: $${outstandingEscrowShortfallUsd.toFixed(2)} needed across ${unconfirmedMembersCount} unconfirmed member(s) within ${priceLockWindowDays} days.`
+  };
+}
+
 
 
 
