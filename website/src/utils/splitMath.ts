@@ -4629,6 +4629,73 @@ export function calculateGroupBookingPriceLockEscrowSplit({
   };
 }
 
+export function calculateCoBookGroupEventTicketAndVipTierSplit({
+  baseGeneralAdmissionPriceUsd = 120,
+  vipUpgradePassFeeUsd = 150,
+  totalGroupSize = 6,
+  vipPassCount = 2,
+  sharedGroupServiceFeeUsd = 60
+}: {
+  baseGeneralAdmissionPriceUsd?: number;
+  vipUpgradePassFeeUsd?: number;
+  totalGroupSize?: number;
+  vipPassCount?: number;
+  sharedGroupServiceFeeUsd?: number;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalGroupSize?: number;
+  vipPassCount?: number;
+  generalMemberShareUsd?: number;
+  vipMemberShareUsd?: number;
+  totalGroupEventCostUsd?: number;
+  perPersonServiceFeeUsd?: number;
+  splitTierStatus?: string;
+  recommendation?: string;
+} {
+  if (typeof baseGeneralAdmissionPriceUsd !== 'number' || baseGeneralAdmissionPriceUsd <= 0) {
+    return { valid: false, error: 'Base general admission price must be a positive number' };
+  }
+  if (typeof totalGroupSize !== 'number' || totalGroupSize <= 0) {
+    return { valid: false, error: 'Total group size must be a positive integer' };
+  }
+  if (typeof vipPassCount !== 'number' || vipPassCount < 0 || vipPassCount > totalGroupSize) {
+    return { valid: false, error: 'VIP pass count cannot be negative or exceed total group size' };
+  }
+
+  const vipFee = typeof vipUpgradePassFeeUsd === 'number' && vipUpgradePassFeeUsd >= 0 ? vipUpgradePassFeeUsd : 0;
+  const serviceFee = typeof sharedGroupServiceFeeUsd === 'number' && sharedGroupServiceFeeUsd >= 0 ? sharedGroupServiceFeeUsd : 0;
+
+  const perPersonServiceFeeUsd = Math.round((serviceFee / totalGroupSize) * 100) / 100;
+  const generalMemberShareUsd = Math.round((baseGeneralAdmissionPriceUsd + perPersonServiceFeeUsd) * 100) / 100;
+  const vipMemberShareUsd = Math.round((generalMemberShareUsd + vipFee) * 100) / 100;
+
+  const generalCount = totalGroupSize - vipPassCount;
+  const totalGroupEventCostUsd = Math.round((generalCount * generalMemberShareUsd + vipPassCount * vipMemberShareUsd) * 100) / 100;
+
+  let splitTierStatus = 'UNIFORM_GENERAL_ADMISSION_SPLIT';
+  if (vipPassCount > 0 && vipPassCount < totalGroupSize) {
+    splitTierStatus = 'TIERED_VIP_AND_GENERAL_ADMISSION_PRORATION';
+  } else if (vipPassCount === totalGroupSize) {
+    splitTierStatus = 'ALL_VIP_TIER_GROUP_SPLIT';
+  }
+
+  return {
+    valid: true,
+    totalGroupSize,
+    vipPassCount,
+    generalMemberShareUsd,
+    vipMemberShareUsd,
+    totalGroupEventCostUsd,
+    perPersonServiceFeeUsd,
+    splitTierStatus,
+    recommendation: vipPassCount > 0
+      ? `Event ticket split ready: GA members pay $${generalMemberShareUsd.toFixed(2)}/person; ${vipPassCount} VIP member(s) pay $${vipMemberShareUsd.toFixed(2)}/person (includes $${vipFee.toFixed(2)} VIP pass fee).`
+      : `All ${totalGroupSize} members pay $${generalMemberShareUsd.toFixed(2)}/person for general admission.`
+  };
+}
+
+
 
 
 
