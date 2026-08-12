@@ -4232,6 +4232,127 @@ export function calculateCoBookDamageDepositEscrowSplit(params: DamageDepositPar
   };
 }
 
+export function calculateGroupDiningAndTipSplitting({
+  items = [
+    { itemName: 'Shared Appetizer', itemCostUsd: 30, consumedBy: ['Alice', 'Bob', 'Charlie'] },
+    { itemName: 'Steak & Wine', itemCostUsd: 45, consumedBy: ['Alice'] },
+    { itemName: 'Vegan Pasta & Juice', itemCostUsd: 25, consumedBy: ['Bob'] },
+    { itemName: 'Salad', itemCostUsd: 20, consumedBy: ['Charlie'] }
+  ],
+  taxRatePct = 8.5,
+  tipRatePct = 18.0,
+  paidByMemberName = 'Alice'
+}: {
+  items?: Array<{ itemName?: string; itemCostUsd?: number; consumedBy?: string[] }>;
+  taxRatePct?: number;
+  tipRatePct?: number;
+  paidByMemberName?: string;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  subtotalUsd?: number;
+  taxAmountUsd?: number;
+  tipAmountUsd?: number;
+  grandTotalUsd?: number;
+  paidByMemberName?: string;
+  memberBreakdown?: Array<{
+    memberName: string;
+    itemSubtotalUsd: number;
+    taxShareUsd: number;
+    tipShareUsd: number;
+    totalShareUsd: number;
+  }>;
+  splitTier?: string;
+  recommendation?: string;
+} {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { valid: false, error: 'Items list must be a non-empty array' };
+  }
+  if (typeof taxRatePct !== 'number' || taxRatePct < 0 || taxRatePct > 40) {
+    return { valid: false, error: 'Tax rate percentage must be between 0 and 40' };
+  }
+  if (typeof tipRatePct !== 'number' || tipRatePct < 0 || tipRatePct > 50) {
+    return { valid: false, error: 'Tip rate percentage must be between 0 and 50' };
+  }
+
+  let subtotalUsd = 0;
+  const memberSubtotals: Record<string, number> = {};
+
+  for (const item of items) {
+    const cost = typeof item.itemCostUsd === 'number' && item.itemCostUsd > 0 ? item.itemCostUsd : 0;
+    subtotalUsd += cost;
+
+    const consumers = Array.isArray(item.consumedBy) && item.consumedBy.length > 0 ? item.consumedBy : ['Guest'];
+    const perConsumerShare = cost / consumers.length;
+
+    for (const member of consumers) {
+      const name = (member || 'Guest').trim();
+      memberSubtotals[name] = (memberSubtotals[name] || 0) + perConsumerShare;
+    }
+  }
+
+  subtotalUsd = Math.round(subtotalUsd * 100) / 100;
+  if (subtotalUsd <= 0) {
+    return { valid: false, error: 'Items subtotal must be greater than zero' };
+  }
+
+  const taxAmountUsd = Math.round((subtotalUsd * (taxRatePct / 100)) * 100) / 100;
+  const tipAmountUsd = Math.round((subtotalUsd * (tipRatePct / 100)) * 100) / 100;
+  const grandTotalUsd = Math.round((subtotalUsd + taxAmountUsd + tipAmountUsd) * 100) / 100;
+
+  const memberNames = Object.keys(memberSubtotals);
+
+  const memberBreakdown = memberNames.map((name, idx) => {
+    const itemSub = Math.round(memberSubtotals[name] * 100) / 100;
+    const ratio = itemSub / subtotalUsd;
+
+    let taxShare = Math.round((taxAmountUsd * ratio) * 100) / 100;
+    let tipShare = Math.round((tipAmountUsd * ratio) * 100) / 100;
+
+    if (idx === memberNames.length - 1) {
+      const currentTaxSum = memberNames.slice(0, idx).reduce((acc, mName) => {
+        const r = (Math.round(memberSubtotals[mName] * 100) / 100) / subtotalUsd;
+        return acc + Math.round((taxAmountUsd * r) * 100) / 100;
+      }, 0);
+      taxShare = Math.round((taxAmountUsd - currentTaxSum) * 100) / 100;
+
+      const currentTipSum = memberNames.slice(0, idx).reduce((acc, mName) => {
+        const r = (Math.round(memberSubtotals[mName] * 100) / 100) / subtotalUsd;
+        return acc + Math.round((tipAmountUsd * r) * 100) / 100;
+      }, 0);
+      tipShare = Math.round((tipAmountUsd - currentTipSum) * 100) / 100;
+    }
+
+    const totalShareUsd = Math.round((itemSub + taxShare + tipShare) * 100) / 100;
+
+    return {
+      memberName: name,
+      itemSubtotalUsd: itemSub,
+      taxShareUsd: taxShare,
+      tipShareUsd: tipShare,
+      totalShareUsd
+    };
+  });
+
+  let splitTier = 'PROPORTIONAL_ITEMIZED_DINING_SPLIT';
+  if (memberNames.length === 1) {
+    splitTier = 'SINGLE_PAYER_FULL_COVERAGE';
+  }
+
+  return {
+    valid: true,
+    subtotalUsd,
+    taxAmountUsd,
+    tipAmountUsd,
+    grandTotalUsd,
+    paidByMemberName,
+    memberBreakdown,
+    splitTier,
+    recommendation: `Group dining bill ($${grandTotalUsd.toFixed(2)} total, $${subtotalUsd.toFixed(2)} subtotal + $${taxAmountUsd.toFixed(2)} tax + $${tipAmountUsd.toFixed(2)} tip) split proportionally across ${memberNames.length} member(s). Paid by ${paidByMemberName}.`
+  };
+}
+
+
 
 
 
