@@ -4352,6 +4352,170 @@ export function calculateGroupDiningAndTipSplitting({
   };
 }
 
+export interface VehicleLeg {
+  legName?: string;
+  distanceMiles?: number;
+  participantsOnLeg?: string[];
+}
+
+export interface FuelOrTollExpense {
+  description?: string;
+  amountUsd?: number;
+  paidByMemberName?: string;
+  type?: 'fuel' | 'ev_charging' | 'toll' | 'parking';
+}
+
+export interface VehicleFuelAndTollParams {
+  totalFuelAndTollExpensesUsd?: number;
+  expensesList?: FuelOrTollExpense[];
+  legsList?: VehicleLeg[];
+  allParticipantsList?: string[];
+  driverWearAndTearReimbursementUsd?: number;
+  driverName?: string;
+}
+
+export function calculateGroupVehicleFuelAndTollSplit(params: VehicleFuelAndTollParams = {}) {
+  const {
+    totalFuelAndTollExpensesUsd = 0,
+    expensesList = [],
+    legsList = [],
+    allParticipantsList = [],
+    driverWearAndTearReimbursementUsd = 0,
+    driverName = ''
+  } = params;
+
+  let computedTotalExpensesUsd = 0;
+  const payerPaymentsMap: Record<string, number> = {};
+
+  if (Array.isArray(expensesList) && expensesList.length > 0) {
+    for (const exp of expensesList) {
+      const amt = typeof exp.amountUsd === 'number' && exp.amountUsd > 0 ? exp.amountUsd : 0;
+      computedTotalExpensesUsd += amt;
+      const payer = (exp.paidByMemberName || driverName || 'Driver').trim();
+      payerPaymentsMap[payer] = (payerPaymentsMap[payer] || 0) + amt;
+    }
+  } else {
+    computedTotalExpensesUsd = Math.max(0, totalFuelAndTollExpensesUsd);
+    if (driverName) {
+      payerPaymentsMap[driverName] = computedTotalExpensesUsd;
+    }
+  }
+
+  computedTotalExpensesUsd = Math.round(computedTotalExpensesUsd * 100) / 100;
+
+  const participants = Array.isArray(allParticipantsList) && allParticipantsList.length > 0
+    ? Array.from(new Set(allParticipantsList.map(p => p.trim()).filter(Boolean)))
+    : Object.keys(payerPaymentsMap);
+
+  if (participants.length === 0 || computedTotalExpensesUsd <= 0) {
+    return {
+      valid: false,
+      error: 'Total fuel/toll expenses must be greater than zero and participants list must not be empty',
+      participantsCount: 0,
+      totalExpensesUsd: 0,
+      participantShareBreakdown: [],
+      splitTier: 'INVALID_INPUT',
+      recommendation: 'Provide valid fuel/toll expenses and participant list.'
+    };
+  }
+
+  const wearAndTearUsd = Math.max(0, Math.round(driverWearAndTearReimbursementUsd * 100) / 100);
+  const grandTotalWithWearUsd = Math.round((computedTotalExpensesUsd + wearAndTearUsd) * 100) / 100;
+
+  const memberPassengerMilesMap: Record<string, number> = {};
+  let totalGroupPassengerMiles = 0;
+
+  if (Array.isArray(legsList) && legsList.length > 0) {
+    for (const leg of legsList) {
+      const miles = typeof leg.distanceMiles === 'number' && leg.distanceMiles > 0 ? leg.distanceMiles : 0;
+      const legMembers = Array.isArray(leg.participantsOnLeg) && leg.participantsOnLeg.length > 0
+        ? leg.participantsOnLeg.map(m => m.trim())
+        : participants;
+
+      for (const member of legMembers) {
+        memberPassengerMilesMap[member] = (memberPassengerMilesMap[member] || 0) + miles;
+        totalGroupPassengerMiles += miles;
+      }
+    }
+  }
+
+  const hasLegData = totalGroupPassengerMiles > 0;
+  const numPeople = participants.length;
+
+  const nonDrivers = driverName ? participants.filter(p => p.toLowerCase() !== driverName.toLowerCase()) : participants;
+  const wearAndTearPerNonDriver = nonDrivers.length > 0 && wearAndTearUsd > 0
+    ? Math.round((wearAndTearUsd / nonDrivers.length) * 100) / 100
+    : 0;
+
+  let allocatedShareSum = 0;
+
+  const participantShareBreakdown = participants.map((name, idx) => {
+    let rawExpenseShare = 0;
+
+    if (hasLegData) {
+      const memberMiles = memberPassengerMilesMap[name] || 0;
+      const ratio = totalGroupPassengerMiles > 0 ? memberMiles / totalGroupPassengerMiles : 1 / numPeople;
+      rawExpenseShare = computedTotalExpensesUsd * ratio;
+    } else {
+      rawExpenseShare = computedTotalExpensesUsd / numPeople;
+    }
+
+    let allocatedExpenseShareUsd = Math.round(rawExpenseShare * 100) / 100;
+    allocatedShareSum += allocatedExpenseShareUsd;
+
+    if (idx === participants.length - 1) {
+      const currentSum = participants.slice(0, idx).reduce((acc, pName) => {
+        if (hasLegData) {
+          const mMiles = memberPassengerMilesMap[pName] || 0;
+          return acc + Math.round((computedTotalExpensesUsd * (mMiles / totalGroupPassengerMiles)) * 100) / 100;
+        }
+        return acc + Math.round((computedTotalExpensesUsd / numPeople) * 100) / 100;
+      }, 0);
+      allocatedExpenseShareUsd = Math.round((computedTotalExpensesUsd - currentSum) * 100) / 100;
+    }
+
+    const paidUsd = Math.round((payerPaymentsMap[name] || 0) * 100) / 100;
+    const wearCompensationCreditUsd = (driverName && name.toLowerCase() === driverName.toLowerCase()) ? wearAndTearUsd : 0;
+    const wearFeeDebitUsd = (driverName && name.toLowerCase() !== driverName.toLowerCase()) ? wearAndTearPerNonDriver : 0;
+
+    const netOwedUsd = Math.round((allocatedExpenseShareUsd + wearFeeDebitUsd - paidUsd - wearCompensationCreditUsd) * 100) / 100;
+
+    return {
+      name,
+      paidUsd,
+      allocatedExpenseShareUsd,
+      wearCompensationCreditUsd,
+      wearFeeDebitUsd,
+      netOwedUsd,
+      passengerMiles: memberPassengerMilesMap[name] || 0
+    };
+  });
+
+  let splitTier = 'EQUAL_ROAD_TRIP_FUEL_SPLIT';
+  if (hasLegData) {
+    splitTier = 'DISTANCE_WEIGHTED_LEG_PRORATION';
+  } else if (wearAndTearUsd > 0) {
+    splitTier = 'DRIVER_WEAR_AND_TEAR_COMPENSATED_SPLIT';
+  }
+
+  return {
+    valid: true,
+    participantsCount: numPeople,
+    totalExpensesUsd: computedTotalExpensesUsd,
+    driverWearAndTearReimbursementUsd: wearAndTearUsd,
+    grandTotalWithWearUsd,
+    driverName: driverName || undefined,
+    participantShareBreakdown,
+    splitTier,
+    recommendation: splitTier === 'DISTANCE_WEIGHTED_LEG_PRORATION'
+      ? `Road trip fuel & tolls ($${computedTotalExpensesUsd.toFixed(2)}) prorated across ${numPeople} member(s) based on passenger-miles per leg.`
+      : splitTier === 'DRIVER_WEAR_AND_TEAR_COMPENSATED_SPLIT'
+      ? `Road trip fuel & tolls ($${computedTotalExpensesUsd.toFixed(2)}) split with $${wearAndTearUsd.toFixed(2)} driver wear-and-tear allowance reimbursed to ${driverName}.`
+      : `Road trip fuel & tolls ($${computedTotalExpensesUsd.toFixed(2)}) split equally across ${numPeople} member(s).`
+  };
+}
+
+
 
 
 
