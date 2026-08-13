@@ -4695,6 +4695,118 @@ export function calculateCoBookGroupEventTicketAndVipTierSplit({
   };
 }
 
+export function calculateGroupVacationRentalRoomTierSplit({
+  totalRentalCostUsd = 2000,
+  taxAndCleaningFeeUsd = 300,
+  rooms = [
+    { roomId: 'master-suite', roomName: 'Master Suite (King, Private Bath)', tierMultiplier: 1.5, occupantIds: ['Alice', 'Bob'] },
+    { roomId: 'bedroom-2', roomName: 'En-Suite Bedroom (Queen)', tierMultiplier: 1.2, occupantIds: ['Charlie'] },
+    { roomId: 'bedroom-3', roomName: 'Standard Bedroom (Double)', tierMultiplier: 1.0, occupantIds: ['David', 'Eve'] }
+  ]
+}: {
+  totalRentalCostUsd?: number;
+  taxAndCleaningFeeUsd?: number;
+  rooms?: Array<{
+    roomId: string;
+    roomName: string;
+    tierMultiplier: number;
+    occupantIds: string[];
+  }>;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalRentalCostUsd?: number;
+  taxAndCleaningFeeUsd?: number;
+  totalGroupCostUsd?: number;
+  occupantShares?: Record<string, number>;
+  roomShares?: Array<{
+    roomId: string;
+    roomName: string;
+    roomTotalUsd: number;
+    perOccupantUsd: number;
+  }>;
+  fairnessIndexScore?: number;
+  splitTierStatus?: string;
+  recommendation?: string;
+} {
+  if (typeof totalRentalCostUsd !== 'number' || totalRentalCostUsd <= 0) {
+    return { valid: false, error: 'Total rental cost must be a positive number' };
+  }
+  if (!Array.isArray(rooms) || rooms.length === 0) {
+    return { valid: false, error: 'Rooms array cannot be empty' };
+  }
+
+  const taxFee = typeof taxAndCleaningFeeUsd === 'number' && taxAndCleaningFeeUsd >= 0 ? taxAndCleaningFeeUsd : 0;
+  const totalGroupCostUsd = Math.round((totalRentalCostUsd + taxFee) * 100) / 100;
+
+  let totalWeightedPoints = 0;
+  let totalOccupantsCount = 0;
+  const occupantToWeightedPointMap: Record<string, number> = {};
+
+  for (const r of rooms) {
+    const multiplier = typeof r.tierMultiplier === 'number' && r.tierMultiplier > 0 ? r.tierMultiplier : 1.0;
+    const occupants = Array.isArray(r.occupantIds) ? r.occupantIds : [];
+    if (occupants.length === 0) continue;
+
+    const pointsPerOccupant = multiplier / occupants.length;
+    for (const occ of occupants) {
+      occupantToWeightedPointMap[occ] = pointsPerOccupant;
+      totalWeightedPoints += pointsPerOccupant;
+      totalOccupantsCount++;
+    }
+  }
+
+  if (totalOccupantsCount === 0 || totalWeightedPoints === 0) {
+    return { valid: false, error: 'Rooms must have at least one occupant assigned' };
+  }
+
+  const occupantShares: Record<string, number> = {};
+  for (const [occ, points] of Object.entries(occupantToWeightedPointMap)) {
+    const share = Math.round((totalGroupCostUsd * (points / totalWeightedPoints)) * 100) / 100;
+    occupantShares[occ] = share;
+  }
+
+  const roomShares: Array<{
+    roomId: string;
+    roomName: string;
+    roomTotalUsd: number;
+    perOccupantUsd: number;
+  }> = [];
+
+  for (const r of rooms) {
+    const occupants = Array.isArray(r.occupantIds) ? r.occupantIds : [];
+    const roomTotalUsd = Math.round(occupants.reduce((acc, occ) => acc + (occupantShares[occ] || 0), 0) * 100) / 100;
+    const perOccupantUsd = occupants.length > 0 ? Math.round((roomTotalUsd / occupants.length) * 100) / 100 : 0;
+    roomShares.push({
+      roomId: r.roomId || 'room',
+      roomName: r.roomName || 'Room',
+      roomTotalUsd,
+      perOccupantUsd
+    });
+  }
+
+  const sharesArr = Object.values(occupantShares);
+  const avgShare = totalGroupCostUsd / totalOccupantsCount;
+  const maxDiff = Math.max(...sharesArr) - Math.min(...sharesArr);
+  const fairnessIndexScore = Math.max(0, Math.min(100, Math.round(100 - (maxDiff / (avgShare || 1)) * 40)));
+
+  let splitTierStatus = 'ROOM_TIER_WEIGHTED_ALLOCATION';
+  if (fairnessIndexScore >= 90) splitTierStatus = 'BALANCED_ROOM_TIER_SPLIT';
+
+  return {
+    valid: true,
+    totalRentalCostUsd,
+    taxAndCleaningFeeUsd: taxFee,
+    totalGroupCostUsd,
+    occupantShares,
+    roomShares,
+    fairnessIndexScore,
+    splitTierStatus,
+    recommendation: `Vacation rental split calculated across ${totalOccupantsCount} occupants (${rooms.length} rooms). Room-tier weighted allocation includes $${taxFee.toFixed(2)} taxes & cleaning fees.`
+  };
+}
+
+
 
 
 
