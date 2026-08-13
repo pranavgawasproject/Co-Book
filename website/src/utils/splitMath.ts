@@ -4908,6 +4908,117 @@ export function calculateCoBookGroupFxHedgingAndFeeSplit({
   };
 }
 
+export interface ExcursionModule {
+  moduleId: string;
+  moduleName: string;
+  additionalCostUsd: number;
+  participantIds: string[];
+}
+
+export function calculateCoBookCharterAndExcursionSplit({
+  charterBaseFeeUsd = 1200,
+  sharedFuelAndPermitsUsd = 300,
+  excursionModules = [
+    { moduleId: 'scuba', moduleName: 'Scuba Diving Gear & Divemaster', additionalCostUsd: 400, participantIds: ['Alice', 'Bob'] },
+    { moduleId: 'wine-tasting', moduleName: 'VIP Wine & Cheese Tasting', additionalCostUsd: 150, participantIds: ['Charlie', 'David'] }
+  ],
+  allGroupMembers = ['Alice', 'Bob', 'Charlie', 'David', 'Eve']
+}: {
+  charterBaseFeeUsd?: number;
+  sharedFuelAndPermitsUsd?: number;
+  excursionModules?: ExcursionModule[];
+  allGroupMembers?: string[];
+} = {}): {
+  valid: boolean;
+  error?: string;
+  totalGroupSize?: number;
+  charterBaseFeeUsd?: number;
+  sharedFuelAndPermitsUsd?: number;
+  baseSharedPerPersonUsd?: number;
+  grandTotalExcursionCostUsd?: number;
+  participantBreakdown?: Array<{
+    memberId: string;
+    baseCharterShareUsd: number;
+    optInModules: string[];
+    optInModulesCostUsd: number;
+    totalMemberCostUsd: number;
+  }>;
+  splitTierStatus?: string;
+  recommendation?: string;
+} {
+  if (typeof charterBaseFeeUsd !== 'number' || charterBaseFeeUsd <= 0) {
+    return { valid: false, error: 'Charter base fee must be a positive number' };
+  }
+  if (!Array.isArray(allGroupMembers) || allGroupMembers.length === 0) {
+    return { valid: false, error: 'Group members array cannot be empty' };
+  }
+
+  const numMembers = allGroupMembers.length;
+  const fuelPermits = typeof sharedFuelAndPermitsUsd === 'number' && sharedFuelAndPermitsUsd >= 0 ? sharedFuelAndPermitsUsd : 0;
+  const totalBaseCost = charterBaseFeeUsd + fuelPermits;
+  const baseSharedPerPersonUsd = Math.round((totalBaseCost / numMembers) * 100) / 100;
+
+  const memberOptInCostsMap: Record<string, { modules: string[]; cost: number }> = {};
+  for (const member of allGroupMembers) {
+    memberOptInCostsMap[member] = { modules: [], cost: 0 };
+  }
+
+  let totalModulesCostUsd = 0;
+  if (Array.isArray(excursionModules) && excursionModules.length > 0) {
+    for (const mod of excursionModules) {
+      const cost = typeof mod.additionalCostUsd === 'number' && mod.additionalCostUsd > 0 ? mod.additionalCostUsd : 0;
+      totalModulesCostUsd += cost;
+
+      const pList = Array.isArray(mod.participantIds) && mod.participantIds.length > 0 ? mod.participantIds : allGroupMembers;
+      const perParticipantModuleShare = cost / pList.length;
+
+      for (const p of pList) {
+        if (!memberOptInCostsMap[p]) {
+          memberOptInCostsMap[p] = { modules: [], cost: 0 };
+        }
+        memberOptInCostsMap[p].modules.push(mod.moduleName || mod.moduleId);
+        memberOptInCostsMap[p].cost += perParticipantModuleShare;
+      }
+    }
+  }
+
+  const grandTotalExcursionCostUsd = Math.round((totalBaseCost + totalModulesCostUsd) * 100) / 100;
+
+  const participantBreakdown = allGroupMembers.map(member => {
+    const optIn = memberOptInCostsMap[member] || { modules: [], cost: 0 };
+    const optInModulesCostUsd = Math.round(optIn.cost * 100) / 100;
+    const totalMemberCostUsd = Math.round((baseSharedPerPersonUsd + optInModulesCostUsd) * 100) / 100;
+
+    return {
+      memberId: member,
+      baseCharterShareUsd: baseSharedPerPersonUsd,
+      optInModules: optIn.modules,
+      optInModulesCostUsd,
+      totalMemberCostUsd
+    };
+  });
+
+  let splitTierStatus = 'UNIFORM_CHARTER_SPLIT';
+  if (excursionModules.length > 0) {
+    splitTierStatus = 'MULTI_TIER_OPT_IN_EXCURSION_PRORATION';
+  }
+
+  return {
+    valid: true,
+    totalGroupSize: numMembers,
+    charterBaseFeeUsd,
+    sharedFuelAndPermitsUsd: fuelPermits,
+    baseSharedPerPersonUsd,
+    grandTotalExcursionCostUsd,
+    participantBreakdown,
+    splitTierStatus,
+    recommendation: excursionModules.length > 0
+      ? `Charter & excursion split ready: Base vessel cost ($${totalBaseCost.toFixed(2)}) split equally ($${baseSharedPerPersonUsd.toFixed(2)}/person); ${excursionModules.length} add-on excursion module(s) allocated strictly to opt-in participants (Grand Total: $${grandTotalExcursionCostUsd.toFixed(2)}).`
+      : `Shared charter cost of $${totalBaseCost.toFixed(2)} split equally across all ${numMembers} members ($${baseSharedPerPersonUsd.toFixed(2)}/person).`
+  };
+}
+
+
 
 
 
