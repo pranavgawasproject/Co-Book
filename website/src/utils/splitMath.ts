@@ -4806,6 +4806,109 @@ export function calculateGroupVacationRentalRoomTierSplit({
   };
 }
 
+export function calculateCoBookGroupFxHedgingAndFeeSplit({
+  baseBookingAmountForeign = 1000,
+  foreignCurrencyCode = 'EUR',
+  settlementCurrencyCode = 'USD',
+  bookingDateFxRate = 1.08,
+  settlementDateFxRate = 1.10,
+  cardForeignTransactionFeePct = 2.5,
+  participantSplitsList = [
+    { name: 'Alice', sharePercentage: 50.0 },
+    { name: 'Bob', sharePercentage: 50.0 }
+  ]
+}: {
+  baseBookingAmountForeign?: number;
+  foreignCurrencyCode?: string;
+  settlementCurrencyCode?: string;
+  bookingDateFxRate?: number;
+  settlementDateFxRate?: number;
+  cardForeignTransactionFeePct?: number;
+  participantSplitsList?: Array<{ name: string; sharePercentage?: number }>;
+} = {}): {
+  valid: boolean;
+  error?: string;
+  baseBookingAmountForeign?: number;
+  foreignCurrencyCode?: string;
+  settlementCurrencyCode?: string;
+  bookingCostSettlementCurr?: number;
+  settlementCostSettlementCurr?: number;
+  fxVolatilityVarianceAmount?: number;
+  foreignTransactionFeeTotal?: number;
+  grandTotalSettlementCost?: number;
+  participantCount?: number;
+  participantBreakdown?: Array<{ name: string; sharePercentage: number; amountOwedSettlementCurr: number }>;
+  fxRiskTierStatus?: string;
+  recommendation?: string;
+} {
+  if (typeof baseBookingAmountForeign !== 'number' || baseBookingAmountForeign <= 0) {
+    return { valid: false, error: 'Base booking amount foreign must be a positive number' };
+  }
+  if (typeof bookingDateFxRate !== 'number' || bookingDateFxRate <= 0) {
+    return { valid: false, error: 'Booking date FX rate must be a positive number' };
+  }
+
+  const settRate = typeof settlementDateFxRate === 'number' && settlementDateFxRate > 0 ? settlementDateFxRate : bookingDateFxRate;
+  const ftFeePct = typeof cardForeignTransactionFeePct === 'number' && cardForeignTransactionFeePct >= 0 ? cardForeignTransactionFeePct : 0;
+  const participants = Array.isArray(participantSplitsList) && participantSplitsList.length > 0 ? participantSplitsList : [];
+
+  if (participants.length === 0) {
+    return { valid: false, error: 'Participant splits list cannot be empty' };
+  }
+
+  const foreignCode = (foreignCurrencyCode || 'EUR').toUpperCase();
+  const settlementCode = (settlementCurrencyCode || 'USD').toUpperCase();
+
+  const bookingCostSettlementCurr = Math.round(baseBookingAmountForeign * bookingDateFxRate * 100) / 100;
+  const settlementCostSettlementCurr = Math.round(baseBookingAmountForeign * settRate * 100) / 100;
+  const fxVolatilityVarianceAmount = Math.round((settlementCostSettlementCurr - bookingCostSettlementCurr) * 100) / 100;
+
+  const foreignTransactionFeeTotal = Math.round((settlementCostSettlementCurr * (ftFeePct / 100)) * 100) / 100;
+  const grandTotalSettlementCost = Math.round((settlementCostSettlementCurr + foreignTransactionFeeTotal) * 100) / 100;
+
+  const participantCount = participants.length;
+  const totalProvidedPct = participants.reduce((acc, p) => acc + (typeof p.sharePercentage === 'number' && p.sharePercentage > 0 ? p.sharePercentage : 0), 0);
+
+  const participantBreakdown = participants.map(p => {
+    const rawPct = typeof p.sharePercentage === 'number' && p.sharePercentage > 0 ? p.sharePercentage : 100 / participantCount;
+    const effectivePct = totalProvidedPct > 0 ? (rawPct / totalProvidedPct) * 100 : 100 / participantCount;
+    const amountOwed = Math.round((grandTotalSettlementCost * (effectivePct / 100)) * 100) / 100;
+    return {
+      name: p.name || 'Member',
+      sharePercentage: Math.round(effectivePct * 10) / 10,
+      amountOwedSettlementCurr: amountOwed
+    };
+  });
+
+  const fxChangePct = Math.abs(Math.round(((settRate - bookingDateFxRate) / bookingDateFxRate) * 100 * 10) / 10);
+
+  let fxRiskTierStatus = 'STABLE_FX_RATES';
+  if (fxChangePct >= 5.0) {
+    fxRiskTierStatus = 'HIGH_FX_VOLATILITY_EXPOSURE';
+  } else if (fxChangePct >= 2.0) {
+    fxRiskTierStatus = 'MODERATE_FX_CURRENCY_FLUCTUATION';
+  }
+
+  return {
+    valid: true,
+    baseBookingAmountForeign,
+    foreignCurrencyCode: foreignCode,
+    settlementCurrencyCode: settlementCode,
+    bookingCostSettlementCurr,
+    settlementCostSettlementCurr,
+    fxVolatilityVarianceAmount,
+    foreignTransactionFeeTotal,
+    grandTotalSettlementCost,
+    participantCount,
+    participantBreakdown,
+    fxRiskTierStatus,
+    recommendation: fxRiskTierStatus === 'HIGH_FX_VOLATILITY_EXPOSURE'
+      ? `High FX volatility alert (${fxChangePct}% exchange rate shift). Booking cost changed by ${fxVolatilityVarianceAmount >= 0 ? '+' : ''}$${fxVolatilityVarianceAmount.toFixed(2)} ${settlementCode} between booking & settlement date.`
+      : `Group FX hedging & split calculated: ${baseBookingAmountForeign} ${foreignCode} = $${grandTotalSettlementCost.toFixed(2)} ${settlementCode} (includes $${foreignTransactionFeeTotal.toFixed(2)} foreign tx fee) split across ${participantCount} member(s).`
+  };
+}
+
+
 
 
 
